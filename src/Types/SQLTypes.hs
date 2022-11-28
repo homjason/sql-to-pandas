@@ -10,8 +10,8 @@ import Data.String (IsString (..))
 import Test.QuickCheck
 
 -- A SQL Query is a collection of statements
-newtype Query = Query [Statement]
-  deriving (Eq, Show)
+-- newtype Query = Query [Statement]
+--   deriving (Eq, Show)
 
 -- QUESTION: Do we need semigroup/monoid?
 -- instance Semigroup SQLQuery where
@@ -21,6 +21,16 @@ newtype Query = Query [Statement]
 --   mempty = SQLQuery []
 
 -- TODO: JOIN, HAVING, Set Operations
+
+data Query = Query {select :: SelectExp, from :: FromExp, wher :: Maybe WhereExp}
+  deriving (Eq, Show)
+
+-- TODO: Think about how to represent this with semigroups and queries
+-- instance Semigroup Query where
+--   Query s1 <> Query s2 = Block (s1 <> s2)
+
+-- instance Monoid Query where
+--   mempty = Query {}
 
 data Statement
   = Select SelectExp -- x = e
@@ -48,15 +58,15 @@ data SelectExp
 -- Datatype for FROM clauses in SQL
 -- We can either select from a named table or from a subquery
 data FromExp
-  = TableName Name
-  | SubQuery Query
+  = TableName Name (Maybe JoinExp)
+  | SubQuery Query (Maybe JoinExp)
   deriving (Eq, Show)
 
 -- Datatype for WHERE clauses in SQL
 data WhereExp
-  = OpC Comparable Comparable -- Comparison operations
-  | OpA Comparable Comparable -- Arithmetic Operations
-  | OpL Bool Bool -- Logical operations
+  = OpC CompOp Comparable Comparable -- Comparison operations
+  | OpA ArithOp Comparable Comparable -- Arithmetic Operations
+  | OpL LogicOp Bool Bool -- Logical operations
   | OpN Name -- NULL/IS NULL
   deriving (Eq, Show)
 
@@ -68,10 +78,15 @@ data Value
   | TableVal Name -- <not used in source programs>
   deriving (Eq, Show, Ord)
 
+-- TODO: Define JoinExp
+data JoinExp
+  = Int
+  deriving (Eq, Show, Ord)
+
 -- Type representing values that can be compared in SQL queries
 data Comparable
   = ColName Name -- column name
-  | Int
+  | Lit Int
   deriving (Eq, Show)
 
 -- Comparison (binary) operations that return a Boolean
@@ -94,7 +109,7 @@ data ArithOp
 
 -- QUESTION: Why don't Enum or Bounded work?
 -- Logical (binary) operations
-data LogOp
+data LogicOp
   = And Bool Bool
   | Or Bool Bool
   deriving (Eq, Show)
