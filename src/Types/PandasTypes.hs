@@ -1,4 +1,4 @@
-module PandasTypes where
+module Types.PandasTypes where
 
 import Control.Applicative ((<|>))
 import Data.Char qualified as Char
@@ -17,13 +17,13 @@ Things we (might) need types for:
 - Applying a Boolean filter (eg. countries[countries['area'] > 1000])
 -}
 
-type DFName = String
+type TableName = String
 
 type ColName = String
 
 -- An atomic Pandas command
 data Command = Command
-  { df :: DFName,
+  { df :: TableName,
     cols :: Maybe [ColName],
     fn :: Maybe Func
   }
@@ -68,7 +68,7 @@ data NullOp
 
 -- Merge expressions for joining tables in Pandas
 data MergeExp = MkMerge
-  { rightDf :: DFName,
+  { rightDf :: TableName,
     leftOn :: ColName,
     rightOn :: ColName,
     how :: MergeStyle
@@ -88,8 +88,7 @@ data AggFunc
   | Max
   deriving (Eq, Show, Enum, Bounded)
 
--- TODO: fix
--- Type representing values that can be compared in SQL queries
+-- Values that can be compared in SQL queries
 data Comparable
   = ColName ColName -- column name
   | LitInt Int -- literal ints

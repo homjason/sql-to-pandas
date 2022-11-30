@@ -1,6 +1,6 @@
 -- File to declare types
 
-module SQLTypes where
+module Types.SQLTypes where
 
 import Control.Applicative ((<|>))
 import Data.Char qualified as Char
@@ -70,14 +70,6 @@ data WhereExp
   | OpN NullOp Name -- NULL/IS NULL
   deriving (Eq, Show)
 
-data Value
-  = NilVal -- nil
-  | IntVal Int -- 1
-  | BoolVal Bool -- false, true
-  | StringVal String -- "abd"
-  | TableVal Name -- <not used in source programs>
-  deriving (Eq, Show, Ord)
-
 -- Datatype for JOIN clauses in SQL (only equality joins supported)
 -- table = the other table you're joining on
 -- condition, where each tuple represents (table name, column name)
@@ -138,8 +130,8 @@ data RenameOp
 
 -- Unary operations for checking if a column is null / not-null
 data NullOp
-  = IsNull Name -- Check whether a column contains null values
-  | IsNotNull Name -- Check whether a column contains non-null values
+  = IsNull ColName -- Check whether a column contains null values
+  | IsNotNull ColName -- Check whether a column contains non-null values
   deriving (Eq, Show)
 
 -- Aggregate Functions
