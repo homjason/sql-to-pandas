@@ -22,7 +22,15 @@ import Test.QuickCheck
 
 -- TODO: JOIN, HAVING, Set Operations
 
-data Query = Query {select :: SelectExp, from :: FromExp, wher :: Maybe WhereExp}
+data Query = Query
+  { select :: SelectExp,
+    from :: FromExp,
+    wher :: Maybe [WhereExp],
+    groupBy :: Maybe [Name],
+    limit :: Maybe Int,
+    orderBy :: Maybe (Name, Order),
+    empty :: ()
+  }
   deriving (Eq, Show)
 
 -- TODO: Think about how to represent this with semigroups and queries
@@ -32,16 +40,6 @@ data Query = Query {select :: SelectExp, from :: FromExp, wher :: Maybe WhereExp
 -- instance Monoid Query where
 --   mempty = Query {}
 
-data Statement
-  = Select SelectExp -- x = e
-  | From FromExp
-  | Where WhereExp
-  | GroupBy [Name] -- Group by one or more columns
-  | Limit Int -- Limit no. of rows in query output
-  | OrderBy Name Order -- Can only order by one column
-  | Empty -- ; (semicolon signalling the end of a SQL query)
-  deriving (Eq, Show)
-
 -- Order in which to sort query results (ascending or descending)
 data Order = Asc | Desc
   deriving (Eq, Show)
@@ -50,10 +48,12 @@ data Order = Asc | Desc
 data SelectExp
   = Cols [Name] -- colnames are a list of string names
   | DistinctCols [Name] -- SELECT DISTINCT in SQL
-  | Agg AggFunc Name -- Aggregate functions (used with GROUP BY clauses)
-  | Val Value -- literal values
-  | As Name -- "AS" keyword in SQL (renaming columns)
-  deriving (Eq, Show)
+  | Agg AggFunc Name Name -- Aggregate functions (used with GROUP BY clauses)
+  deriving
+    ( -- | TODO: RenameOp
+      Eq,
+      Show
+    )
 
 -- Datatype for FROM clauses in SQL
 -- We can either select from a named table or from a subquery
@@ -67,7 +67,7 @@ data WhereExp
   = OpC CompOp Comparable Comparable -- Comparison operations
   | OpA ArithOp Comparable Comparable -- Arithmetic Operations
   | OpL LogicOp Bool Bool -- Logical operations
-  | OpN Name -- NULL/IS NULL
+  | OpN NullOp Name -- NULL/IS NULL
   deriving (Eq, Show)
 
 data Value
@@ -78,15 +78,26 @@ data Value
   | TableVal Name -- <not used in source programs>
   deriving (Eq, Show, Ord)
 
--- TODO: Define JoinExp
-data JoinExp
-  = Int
-  deriving (Eq, Show, Ord)
+-- Datatype for JOIN clauses in SQL (only equality joins supported)
+-- table = the other table you're joining on
+-- condition, where each tuple represents (table name, column name)
+-- ((A, name), (B, id)) == A.name = B.id
+data JoinExp = Join
+  { table :: Name,
+    condition :: ((Name, Name), (Name, Name)),
+    style :: JoinStyle
+  }
+  deriving (Eq, Show)
+
+-- The manner in which the join should be performed in SQL
+data JoinStyle = LeftJoin | RightJoin | InnerJoin
+  deriving (Eq, Show)
 
 -- Type representing values that can be compared in SQL queries
 data Comparable
   = ColName Name -- column name
-  | Lit Int
+  | LitInt Int -- literal ints
+  | LitString String -- literal strings
   deriving (Eq, Show)
 
 -- Comparison (binary) operations that return a Boolean
@@ -113,6 +124,17 @@ data LogicOp
   = And Bool Bool
   | Or Bool Bool
   deriving (Eq, Show)
+
+type TableName = String
+
+type ColName = String
+
+-- TODO: come back to this
+-- `As` operator in SQL
+data RenameOp
+  = AsCol ColName
+  | AsTable TableName
+  | AsAgg ColName ColName
 
 -- Unary operations for checking if a column is null / not-null
 data NullOp
