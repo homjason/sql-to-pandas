@@ -1,9 +1,15 @@
+-- QUESTION FOR JOE: how do we import the module defined in the Types folder?
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ImportQualifiedPost #-}
+
 module QuickCheckTests where
 
--- QUESTION FOR JOE: how do we import the module defined in the Types folder?
-
+import Data.Data (Data, gMapQ)
+import Data.Generics.Aliases (ext1Q)
+import Data.Maybe (isNothing)
 import Parser (Parser)
 import Parser qualified as P
+-- import SQLParser
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
 import Types.PandasTypes
@@ -49,4 +55,24 @@ getSQLTable = undefined
 getPandasTable :: Query -> Table
 getPandasTable = undefined
 
--- TODO: unit tests for parsing
+-- Check if fields corresponding to irrelevant components of a Query
+-- are set to Nothing after parsing
+-- QUESTION FOR JOE: clarify how generics works???
+-- Reference:
+-- https://stackoverflow.com/questions/62580560/how-to-check-if-all-of-the-maybe-fields-in-a-haskell-record-are-nothing
+fieldsAreNothing :: (Data d) => d -> Bool
+fieldsAreNothing = and . gmapQ (const True `ext1Q` fieldsAreNothing)
+
+irrelevantFieldsAreNothing :: (Data d) => d -> Maybe d
+irrelevantFieldsAreNothing x = if fieldsAreNothing x then Nothing else Just x
+
+initialQuery :: Query
+initialQuery =
+  Query
+    { select = EmptySelect,
+      from = EmptyFrom,
+      wher = Nothing,
+      groupBy = Nothing,
+      limit = Nothing,
+      orderBy = Nothing
+    }
