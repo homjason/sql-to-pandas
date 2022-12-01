@@ -8,46 +8,25 @@ import Data.Data (Data)
 import Data.Foldable (toList)
 import Data.String (IsString (..))
 import Test.QuickCheck
+import Types.TableTypes
+import Types.Types
 
--- A SQL Query is a collection of statements
--- newtype Query = Query [Statement]
---   deriving (Eq, Show)
-
--- QUESTION: Do we need semigroup/monoid?
--- instance Semigroup SQLQuery where
---   SQLQuery s1 <> SQLQuery s2 = Block (s1 <> s2)
-
--- instance Monoid SQLQuery where
---   mempty = SQLQuery []
-
--- TODO: JOIN, HAVING, Set Operations
-
+-- Datatype representing a SQL query
 data Query = Query
   { select :: SelectExp,
     from :: FromExp,
-    wher :: Maybe [WhereExp],
-    groupBy :: Maybe [Name],
+    wher :: Maybe [BoolExp],
+    groupBy :: Maybe [ColName],
     limit :: Maybe Int,
-    orderBy :: Maybe (Name, Order)
+    orderBy :: Maybe (ColName, Order)
   }
-  deriving (Eq, Show)
-
--- TODO: Think about how to represent this with semigroups and queries
--- instance Semigroup Query where
---   Query s1 <> Query s2 = Block (s1 <> s2)
-
--- instance Monoid Query where
---   mempty = Query {}
-
--- Order in which to sort query results (ascending or descending)
-data Order = Asc | Desc
   deriving (Eq, Show)
 
 -- Datatype for SELECT clauses in SQL
 data SelectExp
-  = Cols [Name] -- colnames are a list of string names
-  | DistinctCols [Name] -- SELECT DISTINCT in SQL
-  | Agg AggFunc Name Name -- Aggregate functions (used with GROUP BY clauses)
+  = Cols [ColName] -- colnames are a list of string names
+  | DistinctCols [ColName] -- SELECT DISTINCT in SQL
+  | Agg AggFunc ColName ColName -- Aggregate functions (used with GROUP BY clauses)
   | EmptySelect -- initial state of SelectExp prior to parsing
   deriving
     (Eq, Show)
@@ -55,17 +34,9 @@ data SelectExp
 -- Datatype for FROM clauses in SQL
 -- We can either select from a named table or from a subquery
 data FromExp
-  = TableName Name (Maybe JoinExp)
+  = TableName TableName (Maybe JoinExp)
   | SubQuery Query (Maybe JoinExp)
   | EmptyFrom -- initial state of FromExp prior to parsing
-  deriving (Eq, Show)
-
--- Datatype for WHERE clauses in SQL
-data WhereExp
-  = OpC CompOp Comparable Comparable -- Comparison operations
-  | OpA ArithOp Comparable Comparable -- Arithmetic Operations
-  | OpL LogicOp Bool Bool -- Logical operations
-  | OpN NullOp Name -- NULL/IS NULL
   deriving (Eq, Show)
 
 -- Datatype for JOIN clauses in SQL (only equality joins supported)
@@ -73,75 +44,19 @@ data WhereExp
 -- condition, where each tuple represents (table name, column name)
 -- ((A, name), (B, id)) == A.name = B.id
 data JoinExp = Join
-  { table :: Name,
-    condition :: ((Name, Name), (Name, Name)),
+  { table :: TableName,
+    condition :: ((TableName, ColName), (TableName, ColName)),
     style :: JoinStyle
   }
-  deriving (Eq, Show)
-
--- The manner in which the join should be performed in SQL
-data JoinStyle = LeftJoin | RightJoin | InnerJoin
-  deriving (Eq, Show)
-
--- Type representing values that can be compared in SQL queries
-data Comparable
-  = ColName Name -- column name
-  | LitInt Int -- literal ints
-  | LitString String -- literal strings
-  deriving (Eq, Show)
-
--- Comparison (binary) operations that return a Boolean
-data CompOp
-  = Eq -- `=` :: Comparable -> Comparable -> Bool
-  | Gt -- `>`  :: Comparable -> Comparable -> Bool
-  | Ge -- `>=` :: Comparable -> Comparable -> Bool
-  | Lt -- `<`  :: Comparable -> Comparable -> Bool
-  | Le -- `<=` :: Comparable -> Comparable -> Bool
-  deriving (Eq, Show, Enum, Bounded)
-
--- Arithmetic (binary) operations
-data ArithOp
-  = Plus -- `+`  :: Comparable -> Comparable -> Comparable
-  | Minus -- `-`  :: Comparable -> Comparable -> Comparable
-  | Times -- `*`  :: Comparable -> Comparable -> Comparable
-  | Divide -- `/` :: Comparable -> Comparable -> Comparable   -- floor division
-  | Modulo -- `%`  :: Comparable -> Comparable -> Comparable   -- modulo
-  deriving (Eq, Show, Enum, Bounded)
-
--- QUESTION: Why don't Enum or Bounded work?
--- Logical (binary) operations
-data LogicOp
-  = And Bool Bool
-  | Or Bool Bool
   deriving (Eq, Show)
 
 -- Limit the no. of rows in output
 newtype LimitExp = Limit Int
 
-type TableName = String
-
-type ColName = String
-
 -- TODO: come back to this
+-- QUESTION FOR JOE: Do we need to use the state monad to map table aliases to the acutal table datatype?
 -- `As` operator in SQL
 data RenameOp
   = AsCol ColName
   | AsTable TableName
   | AsAgg ColName ColName
-
--- Unary operations for checking if a column is null / not-null
-data NullOp
-  = IsNull ColName -- Check whether a column contains null values
-  | IsNotNull ColName -- Check whether a column contains non-null values
-  deriving (Eq, Show)
-
--- Aggregate Functions
-data AggFunc
-  = Count
-  | Avg
-  | Sum
-  | Min
-  | Max
-  deriving (Eq, Show, Enum, Bounded)
-
-type Name = String -- column names

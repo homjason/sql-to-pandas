@@ -6,7 +6,7 @@ import Data.Foldable (toList)
 import Data.Map (Map)
 import Data.String (IsString (..))
 import Test.QuickCheck
-import Types.SQLTypes (ColName, TableName)
+import Types.Types
 
 -- QUESTION FOR JOE: define tables by row or by column?
 -- (both are implemented below)
