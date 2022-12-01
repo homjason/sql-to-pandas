@@ -8,6 +8,7 @@ import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 import Types.SQLTypes
 import Types.TableTypes
+import Types.Types
 
 -- | Takes a parser, runs it, & skips over any whitespace characters occurring
 -- afterwards
@@ -91,7 +92,7 @@ initialQuery =
       orderBy = Nothing
     }
 
-orderP :: Parser Order
+orderP :: Parser (ColName, Order)
 orderP = undefined
 
 selectExpP :: Parser SelectExp
@@ -111,7 +112,7 @@ joinExpP :: Parser JoinExp
 joinExpP = undefined
 
 -- Parses Where expressions
-whereExpP :: Parser WhereExp
+whereExpP :: Parser BoolExp
 whereExpP = undefined
 
 -- Parsers for various operations

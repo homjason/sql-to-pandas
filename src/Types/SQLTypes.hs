@@ -8,7 +8,7 @@ import Data.Data (Data)
 import Data.Foldable (toList)
 import Data.String (IsString (..))
 import Test.QuickCheck
-import Types.TableTypes
+import Types.TableTypes ()
 import Types.Types
 
 -- Datatype representing a SQL query
