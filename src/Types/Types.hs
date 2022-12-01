@@ -72,4 +72,4 @@ data AggFunc
 
 -- The manner in which the join in SQL (or "merge" in Pandas) should be performed
 data JoinStyle = LeftJoin | RightJoin | InnerJoin
-  deriving (Show, Eq)
+  deriving (Show, Eq, Enum)

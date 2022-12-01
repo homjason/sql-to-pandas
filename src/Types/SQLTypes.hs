@@ -39,6 +39,7 @@ data FromExp
   | EmptyFrom -- initial state of FromExp prior to parsing
   deriving (Eq, Show)
 
+-- Question for JOE: how to disambiguate between TableName & ColNames in the JOIN?
 -- Datatype for JOIN clauses in SQL (only equality joins supported)
 -- table = the other table you're joining on
 -- condition, where each tuple represents (table name, column name)

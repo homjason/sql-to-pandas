@@ -10,6 +10,7 @@ import Types.Types
 
 -- QUESTION FOR JOE: define tables by row or by column?
 -- (both are implemented below)
+-- QUESTION FOR JOE: How to define table quality? (can't sort Maps)
 
 -- Maps each Table's name (alias) to the actual table
 type Store = Map TableName Table
@@ -17,7 +18,7 @@ type Store = Map TableName Table
 -- A table is a list of Rows
 newtype Table = Table [Row]
 
--- Each row is a map from ColName to Maybe Values
+-- Each row is a map from each ColName to a Maybe Value (allowing for null entries)
 type Row = Map ColName (Maybe Value)
 
 -- Each schema is a map from ColName to a ColType
