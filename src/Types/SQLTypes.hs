@@ -28,8 +28,7 @@ data Query = Query
     wher :: Maybe [WhereExp],
     groupBy :: Maybe [Name],
     limit :: Maybe Int,
-    orderBy :: Maybe (Name, Order),
-    empty :: ()
+    orderBy :: Maybe (Name, Order)
   }
   deriving (Eq, Show)
 
@@ -49,17 +48,16 @@ data SelectExp
   = Cols [Name] -- colnames are a list of string names
   | DistinctCols [Name] -- SELECT DISTINCT in SQL
   | Agg AggFunc Name Name -- Aggregate functions (used with GROUP BY clauses)
+  | EmptySelect -- initial state of SelectExp prior to parsing
   deriving
-    ( -- | TODO: RenameOp
-      Eq,
-      Show
-    )
+    (Eq, Show)
 
 -- Datatype for FROM clauses in SQL
 -- We can either select from a named table or from a subquery
 data FromExp
   = TableName Name (Maybe JoinExp)
   | SubQuery Query (Maybe JoinExp)
+  | EmptyFrom -- initial state of FromExp prior to parsing
   deriving (Eq, Show)
 
 -- Datatype for WHERE clauses in SQL
@@ -116,6 +114,9 @@ data LogicOp
   = And Bool Bool
   | Or Bool Bool
   deriving (Eq, Show)
+
+-- Limit the no. of rows in output
+newtype LimitExp = Limit Int
 
 type TableName = String
 

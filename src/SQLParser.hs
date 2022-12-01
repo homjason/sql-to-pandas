@@ -48,8 +48,105 @@ doubleValP = undefined -- "intValP <* stringP "." *> intValP"
 stringValP :: Parser Value
 stringValP = StringVal <$> P.between (P.char '\"') (many $ P.satisfy (/= '\"')) (stringP "\"")
 
--- Parses the command "IS NULL"
+-- Parses the token "IS NULL"
 -- QUESTION FOR JOE: Should we change the type?
 -- IsNull :: ColName -> NullOp
-isNullP :: Parser (ColName -> NullOp)
-isNullP = constP "IS NULL" IsNull
+isNullTokenP :: Parser (ColName -> NullOp)
+isNullTokenP = constP "IS NULL" IsNull
+
+-- Parses the token "IS NOT NULL"
+isNotNullTokenP :: Parser (ColName -> NullOp)
+isNotNullTokenP = constP "IS NOT NULL" IsNotNull
+
+-- Parses the select token
+selectTokenP :: Parser ()
+selectTokenP = stringP "SELECT"
+
+fromTokenP :: Parser ()
+fromTokenP = stringP "FROM"
+
+whereTokenP :: Parser ()
+whereTokenP = stringP "WHERE"
+
+groupByTokenP :: Parser ()
+groupByTokenP = stringP "GROUP BY"
+
+orderByTokenP :: Parser ()
+orderByTokenP = stringP "ORDER BY"
+
+-- QUESTION FOR JOE: Is the type of the limitP parser bad (since it parses a function?)
+-- Parses the "Limit" token & the subsequent integer
+limitP :: Parser (Int -> LimitExp)
+limitP = constP "LIMIT" Limit
+
+-- Initial query prior to parsing
+initialQuery :: Query
+initialQuery =
+  Query
+    { select = EmptySelect,
+      from = EmptyFrom,
+      wher = Nothing,
+      groupBy = Nothing,
+      limit = Nothing,
+      orderBy = Nothing
+    }
+
+orderP :: Parser Order
+orderP = undefined
+
+selectExpP :: Parser SelectExp
+selectExpP = undefined
+
+fromExpP :: Parser FromExp
+fromExpP = undefined
+
+joinStyleP :: Parser JoinStyle
+joinStyleP = undefined
+
+comparableP :: Parser Comparable
+comparableP = undefined
+
+-- Parses Join expressions
+joinExpP :: Parser JoinExp
+joinExpP = undefined
+
+-- Parses Where expressions
+whereExpP :: Parser WhereExp
+whereExpP = undefined
+
+-- Parsers for various operations
+renameOpP :: Parser RenameOp
+renameOpP = undefined
+
+aggFuncOp :: Parser AggFunc
+aggFuncOp = undefined
+
+nullOpP :: Parser NullOp
+nullOpP = undefined
+
+compOpP :: Parser CompOp
+compOpP = undefined
+
+arithOpP :: Parser ArithOp
+arithOpP = undefined
+
+logicOpP :: Parser LogicOp
+logicOpP = undefined
+
+-- Wrapper function for all the query business logic
+-- Returns either a ParseError (Left) or a Query(Right)
+parseQuery :: String -> Either P.ParseError Query
+parseQuery = undefined
+
+-- nullOpP = wsP $ P.string "IS NULL" *> pure isNull
+
+{-
+select = Nothing
+From = NOthing
+Where = Nothing
+
+WE parse the string --> where we find select = val, from = val, where = val
+
+return Query {select = select, from = from, where=from}
+
+-}
