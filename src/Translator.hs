@@ -12,7 +12,7 @@ import Types.TableTypes
 import Types.Types
 
 -- Wrapper function that takes in a Pandas Query and outputs a Pandas Block
-translateSQL :: Query -> Block
+translateSQL :: Query -> Either Error Block
 translateSQL = undefined
 
 {-
