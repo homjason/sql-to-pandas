@@ -10,7 +10,8 @@ import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))
 import Text.PrettyPrint qualified as PP
-import Types.PandasTypes
+import Types.PandasTypes as Pandas
+import Types.SQLTypes as SQL
 import Types.TableTypes
 import Types.Types
 
@@ -40,7 +41,7 @@ instance PP Func where
   pp (SortValues cName o) = undefined
   pp (Rename colNameMap) = undefined
   pp (GroupBy colNames) = undefined
-  pp (Agg fn col newCol) = undefined
+  pp (Pandas.Agg fn col newCol) = undefined
   pp (Loc boolExp) = undefined
   pp (Merge mergeExp) = undefined
   pp (Unique colNames) = undefined
@@ -63,4 +64,10 @@ instance PP Row where
   pp = undefined
 
 instance PP Table where
+  pp = undefined
+
+instance PP Value where
+  pp = undefined
+
+instance PP Query where
   pp = undefined

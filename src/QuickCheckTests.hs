@@ -9,15 +9,13 @@ import Data.Generics.Aliases (ext1Q)
 import Data.Maybe (isNothing)
 import Parser (Parser)
 import Parser qualified as P
--- import SQLParser
-
--- import Types.PandasTypes
--- import Types.SQLTypes
-
 import Print
+import SQLParser
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
-import Types.SQLTypes (SelectExp)
+import Translator
+import Types.PandasTypes
+import Types.SQLTypes
 import Types.TableTypes
 import Types.TableTypes (Row)
 import Types.Types
@@ -107,19 +105,22 @@ quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 
 genTableName :: Gen TableName
 genTableName = QC.elements ["_G", "x", "X", "y", "x0", "X0", "xy", "XY", "_x"]
 
+prop_roundtrip_val :: Value -> Bool
+prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
+
 prop_roundtrip_query :: Query -> Bool
-prop_roundtrip_query q = P.parse parseQuery (pretty q) == Right q
+prop_roundtrip_query q = parseQuery (pretty q) == Right q
 
 prop_table_equality :: Query -> Bool
 prop_table_equality q = pretty (getSQLTable q) == pretty (getPandasTable (translateSQL q))
 
 prop_table_len :: Query -> Bool
-prop_table_len q = len $ pretty (getSQLTable q) == len $ pretty (getPandasTable (translateSQL q))
+prop_table_len q = length (pretty (getSQLTable q)) == length (pretty (getPandasTable (translateSQL q)))
 
 getSQLTable :: Query -> Table
 getSQLTable = undefined
 
-getPandasTable :: Query -> Table
+getPandasTable :: Block -> Table
 getPandasTable = undefined
 
 -- Check if fields corresponding to irrelevant components of a Query
@@ -144,3 +145,8 @@ initialQuery =
       limit = Nothing,
       orderBy = Nothing
     }
+
+-- checkTableEquality :: Table --> Table
+-- checkTableEquality t1 t2 = Data.List.sort t1 == Data.List.sort t2
+
+-- TODO: unit tests for parsing

@@ -12,7 +12,7 @@ import Types.TableTypes
 import Types.Types
 
 -- Wrapper function that takes in a Pandas Query and outputs a Pandas Block
-translateSQL :: Query -> Either Error Block
+translateSQL :: Query -> Block
 translateSQL = undefined
 
 {-
@@ -44,7 +44,7 @@ selectExpToCols :: SelectExp -> [ColName]
 selectExpToCols = undefined
 
 -- Converts "WHERE" expressions in SQL to "loc" function in Pandas
-whereExpToLoc :: WhereExp -> Func
+whereExpToLoc :: BoolExp -> Func
 whereExpToLoc = undefined
 
 -- Converts "LIMIT" clauses in SQL to "head" function in Pandas
