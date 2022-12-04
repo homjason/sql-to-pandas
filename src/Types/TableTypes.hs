@@ -1,5 +1,7 @@
 module Types.TableTypes where
 
+import Data.Array (Array, (!), (//))
+import Data.Array qualified as A
 import Data.Char qualified as Char
 import Data.Data (Data)
 import Data.Foldable (toList)
@@ -15,11 +17,24 @@ import Types.Types
 -- Maps each Table's name (alias) to the actual table
 type Store = Map TableName Table
 
--- A table is a list of Rows
-newtype Table = Table [Row]
+-- Represents a singular value stored in a Table
+data Value
+  = NullVal -- null
+  | IntVal Int -- 1
+  | BoolVal Bool -- false, true
+  | StringVal String -- "abd"
+  | DoubleVal Double -- 64-bit
+  deriving (Eq, Show, Ord)
+
+-- Tables are represented as Arrays, indexed by their (row, col)
+-- (Recommended by Joe)
+type Table = Array (Int, Int) Value
+
+-- Joe: represent Rows as Maybe Values, enforce row invariants at runtime
+type Row = [Maybe Value]
 
 -- Each row is a map from each ColName to a Maybe Value (allowing for null entries)
-type Row = Map ColName (Maybe Value)
+-- type Row = Map ColName (Maybe Value)
 
 -- Each schema is a map from ColName to a ColType
 type Schema = Map ColName ColType
@@ -28,26 +43,5 @@ type Schema = Map ColName ColType
 data ColType = Int | String | Bool | Double
   deriving (Show, Eq, Enum)
 
-{-
--- Alternate: a Table is a Map from column name to column values
-type Table' = Map ColName Col
-
--- A column in the table is a list of Maybes (allow for null values)
-data Col
-  = IntCol [Maybe Int]
-  | StringCol [Maybe String]
-  | BoolCol [Maybe Bool]
-  | DoubleCol [Maybe Double]
-  deriving (Show, Eq)
--}
-
 -- Allows a single column in a named table to be referenced (eg. "t.col")
 type Reference = (TableName, ColName)
-
-data Value
-  = NullVal -- null
-  | IntVal Int -- 1
-  | BoolVal Bool -- false, true
-  | StringVal String -- "abd"
-  | DoubleVal Double -- 64-bit
-  deriving (Eq, Show, Ord)
