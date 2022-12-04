@@ -91,7 +91,7 @@ smallInt :: Gen Int
 smallInt = chooseInt (0, 5)
 
 instance Arbitrary Table where
-  arbitray :: Gen Table
+  arbitrary :: Gen Table
   arbitrary = undefined
 
   shrink :: Table -> [Table]

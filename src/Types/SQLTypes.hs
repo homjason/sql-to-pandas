@@ -39,17 +39,15 @@ data FromExp
   | EmptyFrom -- initial state of FromExp prior to parsing
   deriving (Eq, Show)
 
--- Question for JOE: how to disambiguate between TableName & ColNames in the JOIN?
 -- Datatype for JOIN clauses in SQL (only equality joins supported)
--- table = the other table you're joining on
--- condition, where each tuple represents (table name, column name)
--- ((A, name), (B, id)) == A.name = B.id
+-- Note: updated JoinExp to be a record (12/4)
 data JoinExp = Join
-  { table :: TableName,
-    condition :: ((TableName, ColName), (TableName, ColName)),
+  { leftTable :: TableName,
+    leftCol :: ColName,
+    rightTable :: TableName,
+    rightCol :: ColName,
     style :: JoinStyle
   }
-  deriving (Eq, Show)
 
 -- Limit the no. of rows in output
 newtype LimitExp = Limit Int

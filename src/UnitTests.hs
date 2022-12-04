@@ -25,12 +25,6 @@ test_parseQuerySimple =
               }
       ]
 
--- test_simpleSelectFrom :: Test
--- test_simpleSelectFrom =
---   "simple SELECT & FROM"
---     ~: TestList
---       []
-
 test_selectExpP :: Test
 test_selectExpP =
   "parsing SELECT expressions"
