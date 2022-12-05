@@ -26,6 +26,7 @@ data Query = Query
 data SelectExp
   = Cols [ColName] -- colnames are a list of string names
   | DistinctCols [ColName] -- SELECT DISTINCT in SQL
+  | Star -- SELECT * in SQL (select all columns from the tablename)
   | Agg AggFunc ColName ColName -- Aggregate functions (used with GROUP BY clauses)
   deriving
     (Eq, Show)

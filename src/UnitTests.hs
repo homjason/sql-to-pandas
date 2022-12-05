@@ -91,3 +91,40 @@ test_doubleValP =
         P.parse doubleValP "1.00" ~?= Right (DoubleVal (1.0 :: Double)),
         P.parse doubleValP "-3.00" ~?= Right (DoubleVal (-3.0 :: Double))
       ]
+
+-- TRANSLATOR unit tests
+
+selectStarQ :: Query
+selectStarQ =
+  Query
+    { select = Star,
+      from = "df",
+      wher = Nothing,
+      groupBy = Nothing,
+      limit = Nothing,
+      orderBy = Nothing
+    }
+
+selectStarCommand :: Command
+selectStarCommand =
+  Command
+    { df = "df",
+      cols = Nothing,
+      fn = Nothing
+    }
+
+test_translateSQLSimple :: Test
+test_translateSQLSimple =
+  "simple SQL queries to Pandas"
+    ~: TestList
+      [ translateSQL selectStarQ ~?= Block [selectStarCommand]
+      ]
+
+-- Converting "SELECT" expressions into list of colnames in Pandas
+test_selectExpToCols :: Test
+test_selectExpToCols =
+  "translating SQL SELECT to Pandas"
+    ~: TestList
+      [ selectExpToCols $ Star ~?= ([] :: [ColName]),
+        selectExpToCols $ Cols ["colA", "colB", "colC"] ~?= ["colA", "colB", "colC"]
+      ]
