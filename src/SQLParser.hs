@@ -81,16 +81,16 @@ limitP :: Parser (Int -> LimitExp)
 limitP = constP "LIMIT" Limit
 
 -- Initial query prior to parsing
-initialQuery :: Query
-initialQuery =
-  Query
-    { select = EmptySelect,
-      from = EmptyFrom,
-      wher = Nothing,
-      groupBy = Nothing,
-      limit = Nothing,
-      orderBy = Nothing
-    }
+-- initialQuery :: Query
+-- initialQuery =
+--   Query
+--     { select = EmptySelect,
+--       from = EmptyFrom,
+--       wher = Nothing,
+--       groupBy = Nothing,
+--       limit = Nothing,
+--       orderBy = Nothing
+--     }
 
 orderP :: Parser (ColName, Order)
 orderP = undefined

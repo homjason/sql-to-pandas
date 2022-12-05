@@ -27,7 +27,6 @@ data SelectExp
   = Cols [ColName] -- colnames are a list of string names
   | DistinctCols [ColName] -- SELECT DISTINCT in SQL
   | Agg AggFunc ColName ColName -- Aggregate functions (used with GROUP BY clauses)
-  | EmptySelect -- initial state of SelectExp prior to parsing
   deriving
     (Eq, Show)
 
@@ -36,7 +35,6 @@ data SelectExp
 data FromExp
   = TableName TableName (Maybe JoinExp)
   | SubQuery Query (Maybe JoinExp)
-  | EmptyFrom -- initial state of FromExp prior to parsing
   deriving (Eq, Show)
 
 -- Datatype for JOIN clauses in SQL (only equality joins supported)
