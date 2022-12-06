@@ -1,11 +1,10 @@
 -- QUESTION FOR JOE: how do we import the module defined in the Types folder?
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 
 module QuickCheckTests where
 
 import Data.Data (Data, gMapQ)
-import Data.Generics.Aliases (ext1Q)
+-- import Data.Generics.Aliases (ext1Q)
 import Data.Maybe (isNothing)
 import Parser (Parser)
 import Parser qualified as P
@@ -17,20 +16,7 @@ import Translator
 import Types.PandasTypes
 import Types.SQLTypes
 import Types.TableTypes
-import Types.TableTypes (Row)
 import Types.Types
-
--- Generator for aggregate functions
-genAggFunc :: Gen AggFunc
-genAggFunc = QC.elements [Count, Avg, Sum, Min, Max]
-
--- Generator for the style in which two tables should be joined
-genJoinStyle :: Gen JoinStyle
-genJoinStyle = QC.elements [LeftJoin, RightJoin, InnerJoin]
-
--- Generator for the choice of sort order
-genOrder :: Gen Order
-genOrder = QC.elements [Asc, Desc]
 
 genSelectExp :: Gen SelectExp
 genSelectExp =
@@ -49,6 +35,14 @@ colNames = ["total_bill", "tip", "day", "party_size"]
 genColName :: Gen ColName
 genColName = QC.elements colNames
 
+-- List of permitted TableNames
+tableNames :: [TableName]
+tableNames = ["df", "df1", "df2"]
+
+-- Generator for table names
+genTableName :: Gen TableName
+genTableName = QC.elements tableNames
+
 -- Generator for Aggregate Function Expressions in SELECT
 genAgg :: Gen SelectExp
 genAgg = do
@@ -61,9 +55,29 @@ genAgg = do
 genFromExp :: Gen FromExp
 genFromExp = undefined
 
+-- Generator for Join Expressions
+genJoinExp :: Gen JoinExp
+genJoinExp = undefined
+
 -- Generator for WHERE expressions
 genBoolExp :: Gen BoolExp
-genBoolExp = undefined
+genBoolExp =
+  QC.oneof
+    [ OpC <$> genComparable <*> arbitrary <*> genComparable,
+      OpA <$> genComparable <*> arbitrary <*> genComparable,
+      OpL <$> arbitrary <*> arbitrary <*> arbitrary,
+      OpN <$> arbitrary <*> genColName
+    ]
+
+-- Generator for Comparable values
+genComparable :: Gen Comparable
+genComparable =
+  QC.oneof
+    [ ColName <$> genColName,
+      LitInt <$> genSmallInt,
+      LitString <$> genSmallString,
+      LitDouble <$> genSmallDouble
+    ]
 
 -- Arbitrary SQL queries
 instance Arbitrary Query where
@@ -78,18 +92,52 @@ instance Arbitrary Query where
 genRow :: Gen Row
 genRow = undefined
 
--- | Generator for small strings (from HW4)
-smallString :: Gen String
-smallString = resize 15 arbitrary
+-- | Generator for strings of length <= 10 that only contain letters a-d (from HW4)
+genSmallString :: Gen String
+genSmallString = resize 10 (listOf (elements "abcd"))
 
 -- | Generator that produces small lists of non-empty strings
-smallNonEmptyStringLists :: Gen String
-smallNonEmptyStringLists = resize 15 $ listOf1 arbitrary
+genSmallNonEmptyStringLists :: Gen String
+genSmallNonEmptyStringLists = resize 15 $ listOf1 arbitrary
 
 -- Generator for small Ints (between 0 & 5)
-smallInt :: Gen Int
-smallInt = chooseInt (0, 5)
+genSmallInt :: Gen Int
+genSmallInt = chooseInt (0, 5)
 
+-- Generator for small Doubles (between 0.00 & 50.00)
+genSmallDouble :: Gen Double
+genSmallDouble = choose (0.00 :: Double, 50.00 :: Double)
+
+----------------------------------------------------
+-- Arbitrary instances for Enum types
+
+-- Generators for unary & binary operators
+instance Arbitrary CompOp where
+  arbitrary = QC.arbitraryBoundedEnum
+
+instance Arbitrary ArithOp where
+  arbitrary = QC.arbitraryBoundedEnum
+
+instance Arbitrary LogicOp where
+  arbitrary = QC.arbitraryBoundedEnum
+
+instance Arbitrary NullOp where
+  arbitrary = QC.arbitraryBoundedEnum
+
+-- Generator for aggregate functions
+instance Arbitrary AggFunc where
+  arbitrary = QC.arbitraryBoundedEnum
+
+-- Generator for the style in which two tables should be joined
+instance Arbitrary JoinStyle where
+  arbitrary = QC.arbitraryBoundedEnum
+
+-- Generator for the choice of sort order
+instance Arbitrary Order where
+  arbitrary = QC.arbitraryBoundedEnum
+
+-----------------------------------------------------
+-- Generators for Tables
 instance Arbitrary Table where
   arbitrary :: Gen Table
   arbitrary = undefined

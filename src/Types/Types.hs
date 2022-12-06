@@ -13,13 +13,13 @@ type ColName = String
 
 -- Order in which to sort query results (ascending or descending)
 data Order = Asc | Desc
-  deriving (Show, Eq)
+  deriving (Show, Eq, Enum, Bounded)
 
 -- Datatype for filtering on rows in Pandas (akin to WHERE clauses in SQL)
 data BoolExp
-  = OpC CompOp Comparable Comparable -- Comparison operations
-  | OpA ArithOp Comparable Comparable -- Arithmetic Operations
-  | OpL LogicOp Bool Bool -- Logical operations
+  = OpC Comparable CompOp Comparable -- Comparison operations
+  | OpA Comparable ArithOp Comparable -- Arithmetic Operations
+  | OpL Bool LogicOp Bool -- Logical operations
   | OpN NullOp ColName -- isna() / notna() in Pandas
   deriving (Eq, Show)
 
@@ -28,6 +28,7 @@ data Comparable
   = ColName ColName -- column name
   | LitInt Int -- literal ints
   | LitString String -- literal strings
+  | LitDouble Double -- literal doubles
   deriving (Eq, Show)
 
 -- Comparison (binary) operations that return a Boolean
@@ -50,16 +51,16 @@ data ArithOp
 
 -- Logical (binary) operations
 data LogicOp
-  = And Bool Bool
-  | Or Bool Bool
-  deriving (Eq, Show)
+  = And
+  | Or
+  deriving (Eq, Show, Enum, Bounded)
 
 -- Unary operations for checking if a column is null / not-null
 -- akin to isna() & notna() in Pandas
 data NullOp
-  = IsNull ColName -- Check whether a column contains null values
-  | IsNotNull ColName -- Check whether a column contains non-null values
-  deriving (Eq, Show)
+  = IsNull -- Check whether a column contains null values
+  | IsNotNull -- Check whether a column contains non-null values
+  deriving (Eq, Show, Enum, Bounded)
 
 -- Aggregate Functions to be used with a GroupBy
 data AggFunc
@@ -72,4 +73,4 @@ data AggFunc
 
 -- The manner in which the join in SQL (or "merge" in Pandas) should be performed
 data JoinStyle = LeftJoin | RightJoin | InnerJoin
-  deriving (Show, Eq, Enum)
+  deriving (Show, Eq, Enum, Bounded)
