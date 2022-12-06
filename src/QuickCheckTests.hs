@@ -37,7 +37,7 @@ genColName = QC.elements colNames
 
 -- List of permitted TableNames
 tableNames :: [TableName]
-tableNames = ["df", "df1", "df2"]
+tableNames = ["df", "df1", "df2", "_G", "x", "X", "y", "x0", "X0", "xy", "XY", "_x"]
 
 -- Generator for table names
 genTableName :: Gen TableName
@@ -54,10 +54,6 @@ genAgg = do
 -- Generator for FROM expressions
 genFromExp :: Gen FromExp
 genFromExp = undefined
-
--- Generator for Join Expressions
-genJoinExp :: Gen JoinExp
-genJoinExp = undefined
 
 -- Generator for WHERE expressions
 genBoolExp :: Gen BoolExp
@@ -78,6 +74,28 @@ genComparable =
       LitString <$> genSmallString,
       LitDouble <$> genSmallDouble
     ]
+
+-- TODO: how to ensure that genColName returns
+-- an actual col from the table???
+
+-- TODO: how to avoid leftTable & rightTable being the same?
+-- (write a generator for pairs of distinct TableNames??)
+-- Generator for Join Expressions
+instance Arbitrary JoinExp where
+  arbitrary = do
+    leftTable <- genTableName
+    leftCol <- genColName
+    rightTable <- genTableName
+    rightCol <- genColName
+    style <- arbitrary
+    return $
+      Join
+        { leftTable = leftTable,
+          leftCol = leftCol,
+          rightTable = rightTable,
+          rightCol = rightCol,
+          style = style
+        }
 
 -- Arbitrary SQL queries
 instance Arbitrary Query where
@@ -150,9 +168,9 @@ quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 
 
 -- | Generate a small set of names for generated tests. These names are guaranteed to not include
 -- reserved words
-genTableName :: Gen TableName
-genTableName = QC.elements ["_G", "x", "X", "y", "x0", "X0", "xy", "XY", "_x"]
-
+-- genOtherTableName :: Gen TableName
+-- genOtherTableName = do
+--   table <-
 prop_roundtrip_val :: Value -> Bool
 prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
 
@@ -182,17 +200,6 @@ fieldsAreNothing = and . gmapQ (const True `ext1Q` isNothing)
 irrelevantFieldsAreNothing :: (Data d) => d -> Maybe d
 irrelevantFieldsAreNothing x =
   if fieldsAreNothing x then Nothing else Just x
-
-initialQuery :: Query
-initialQuery =
-  Query
-    { select = EmptySelect,
-      from = EmptyFrom,
-      wher = Nothing,
-      groupBy = Nothing,
-      limit = Nothing,
-      orderBy = Nothing
-    }
 
 -- checkTableEquality :: Table --> Table
 -- checkTableEquality t1 t2 = Data.List.sort t1 == Data.List.sort t2
