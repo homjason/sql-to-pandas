@@ -1,12 +1,15 @@
 module SQLParser where
 
 import Control.Applicative
-import Data.Char qualified as Char
+import Data.Char (isSpace, toLower)
+import Data.Either (rights)
+import Data.List (dropWhileEnd)
+import Data.List.Split (splitOn)
 import Parser (Parser)
 import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
-import Types.SQLTypes
+import Types.SQLTypes (ColExp (..), FromExp, JoinExp, LimitExp (Limit), Query, RenameOp, SelectExp (..))
 import Types.TableTypes
 import Types.Types
 
@@ -27,8 +30,51 @@ stringP str = wsP (P.string str) *> pure ()
 constP :: String -> a -> Parser a
 constP s x = stringP s *> pure x
 
+-- | Parses between parentheses
 parens :: Parser a -> Parser a
 parens x = P.between (stringP "(") x (stringP ")")
+
+-- | Parses colnames (any sequence of upper and lowercase letters, digits &
+-- underscores, not beginning with a digit and not being a reserved word)
+colNameP :: Parser ColName
+colNameP = P.filter (`notElem` reserved) (wsP $ liftA2 (:) startChar $ many remainingChars)
+  where
+    startChar = P.alpha <|> P.char '_'
+    remainingChars = startChar <|> P.digit
+
+-- Reserved keywords in SQL
+reserved :: [String]
+reserved =
+  [ "select",
+    "from",
+    "where",
+    "group",
+    "by",
+    "group_by",
+    "true",
+    "false",
+    "case",
+    "if",
+    "in",
+    "not",
+    "and",
+    "or",
+    "limit",
+    "order",
+    "order_by",
+    "sum",
+    "avg",
+    "count",
+    "min",
+    "max",
+    "join",
+    "on",
+    "distinct",
+    "minus",
+    "as",
+    "union",
+    "intersect"
+  ]
 
 -- Parses literal values (ints, booleans, strings, doubles)
 valueP :: Parser Value
@@ -52,33 +98,79 @@ stringValP = StringVal <$> P.between (P.char '\"') (many $ P.satisfy (/= '\"')) 
 -- Parses the token "IS NULL"
 -- QUESTION FOR JOE: Should we change the type?
 -- IsNull :: ColName -> NullOp
-isNullTokenP :: Parser (ColName -> NullOp)
-isNullTokenP = constP "IS NULL" IsNull
+-- isNullTokenP :: Parser (ColName -> NullOp)
+-- isNullTokenP = constP "is null" IsNull
 
 -- Parses the token "IS NOT NULL"
-isNotNullTokenP :: Parser (ColName -> NullOp)
-isNotNullTokenP = constP "IS NOT NULL" IsNotNull
+-- isNotNullTokenP :: Parser (ColName -> NullOp)
+-- isNotNullTokenP = constP "is not null" IsNotNull
 
--- Parses the select token
+-- Parses the SELECT token
 selectTokenP :: Parser ()
-selectTokenP = stringP "SELECT"
+selectTokenP = stringP "select"
+
+-- Parses the names of aggregate functions and returns a function from ColName -> ColExp
+aggFuncTokenP :: Parser (ColName -> ColExp)
+aggFuncTokenP =
+  constP "count" (Agg Count)
+    <|> constP "avg" (Agg Avg)
+    <|> constP "sum" (Agg Sum)
+    <|> constP "min" (Agg Min)
+    <|> constP "max" (Agg Max)
+
+-- Names of aggregate functions
+aggFuncNames :: [String]
+aggFuncNames = ["count", "avg", "sum", "min", "max"]
+
+-- Strips leading/trailing whitespace from a string
+-- https://stackoverflow.com/questions/6270324/in-haskell-how-do-you-trim-whitespace-from-the-beginning-and-end-of-a-string
+stripSpace :: String -> String
+stripSpace = dropWhileEnd isSpace . dropWhile isSpace
+
+-- >>> stripSpace "     hello world "
+
+-- Parses a string corresponding to a SELECT expression
+selectExpP :: String -> Either P.ParseError SelectExp
+selectExpP str =
+  case P.doParse selectTokenP str of
+    Nothing -> Left "No parses"
+    Just ((), remainderStr) ->
+      case remainderStr of
+        "*" -> Right Star
+        _ ->
+          let cols = map stripSpace (splitOn "," remainderStr)
+           in case cols of
+                [] -> Left "No columns selected to Query"
+                hd : tl -> case hd of
+                  "distinct" -> Right $ DistinctCols (selectExpHelper tl)
+                  _ -> Right $ Cols (selectExpHelper cols)
+
+-- Recursive helper for iterating over list of colnames
+selectExpHelper :: [String] -> [ColExp]
+selectExpHelper strs = rights (map parseSelectAttr strs)
+
+-- Parses a single string as a ColExp
+parseSelectAttr :: String -> Either P.ParseError ColExp
+parseSelectAttr str
+  | str `elem` aggFuncNames = P.parse (aggFuncTokenP <*> parens colNameP) str
+  | otherwise = Col <$> P.parse colNameP str
 
 fromTokenP :: Parser ()
-fromTokenP = stringP "FROM"
+fromTokenP = stringP "from"
 
 whereTokenP :: Parser ()
-whereTokenP = stringP "WHERE"
+whereTokenP = stringP "where"
 
 groupByTokenP :: Parser ()
-groupByTokenP = stringP "GROUP BY"
+groupByTokenP = stringP "group by"
 
 orderByTokenP :: Parser ()
-orderByTokenP = stringP "ORDER BY"
+orderByTokenP = stringP "order by"
 
 -- QUESTION FOR JOE: Is the type of the limitP parser bad (since it parses a function?)
 -- Parses the "Limit" token & the subsequent integer
 limitP :: Parser (Int -> LimitExp)
-limitP = constP "LIMIT" Limit
+limitP = constP "limit" Limit
 
 -- Initial query prior to parsing
 -- initialQuery :: Query
@@ -94,9 +186,6 @@ limitP = constP "LIMIT" Limit
 
 orderP :: Parser (ColName, Order)
 orderP = undefined
-
-selectExpP :: Parser SelectExp
-selectExpP = undefined
 
 fromExpP :: Parser FromExp
 fromExpP = undefined
@@ -135,9 +224,18 @@ logicOpP :: Parser LogicOp
 logicOpP = undefined
 
 -- Wrapper function for all the query business logic
--- Returns either a ParseError (Left) or a Query(Right)
-parseQuery :: String -> Either P.ParseError Query
-parseQuery = undefined
+
+parseQuery :: Parser Query
+parseQuery = undefined "wsP $ selectExpP <|> fromExpP"
+
+-- Converts query string to lower case & splits on new lines
+splitQueryString :: String -> [String]
+splitQueryString str = lines (map toLower str)
+
+-- Parses a SQL file (takes in filename of the SQL file)
+-- Returns either a ParseError (Left) or a Query (Right)
+parseSqlFile :: String -> IO (Either P.ParseError Query)
+parseSqlFile = P.parseFromFile (const <$> parseQuery <*> P.eof)
 
 -- nullOpP = wsP $ P.string "IS NULL" *> pure isNull
 

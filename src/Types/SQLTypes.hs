@@ -24,10 +24,17 @@ data Query = Query
 
 -- Datatype for SELECT clauses in SQL
 data SelectExp
-  = Cols [ColName] -- colnames are a list of string names
-  | DistinctCols [ColName] -- SELECT DISTINCT in SQL
+  = Cols [ColExp] -- colnames are a list of string names
+  | DistinctCols [ColExp] -- SELECT DISTINCT in SQL
   | Star -- SELECT * in SQL (select all columns from the tablename)
-  | Agg AggFunc ColName ColName -- Aggregate functions (used with GROUP BY clauses)
+  deriving
+    (Eq, Show)
+
+-- Column expressions are allowed to be colname string literals
+-- or aggregate functions for SELECT expressions
+data ColExp
+  = Col ColName
+  | Agg AggFunc ColName -- Aggregate functions (used with GROUP BY clauses)
   deriving
     (Eq, Show)
 
@@ -47,6 +54,7 @@ data JoinExp = Join
     rightCol :: ColName,
     style :: JoinStyle
   }
+  deriving (Eq, Show)
 
 -- Limit the no. of rows in output
 newtype LimitExp = Limit Int
