@@ -9,7 +9,8 @@ import Parser (Parser)
 import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
-import Types.SQLTypes (ColExp (..), FromExp, JoinExp, LimitExp (Limit), Query, RenameOp, SelectExp (..))
+import Types.SQLTypes
+-- import Types.SQLTypes (ColExp (..), FromExp, JoinExp, LimitExp (Limit), Query, RenameOp, SelectExp (..))
 import Types.TableTypes
 import Types.Types
 

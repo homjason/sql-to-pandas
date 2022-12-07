@@ -3,7 +3,7 @@
 
 module QuickCheckTests where
 
-import Data.Data (Data, gMapQ)
+import Data.Data (Data)
 -- import Data.Generics.Aliases (ext1Q)
 import Data.Maybe (isNothing)
 import Parser (Parser)
