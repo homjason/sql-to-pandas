@@ -47,6 +47,34 @@ test_selectExpP =
 -- >>> runTestTT test_selectExpP
 -- Counts {cases = 5, tried = 5, errors = 0, failures = 1}
 
+-- GROUP BY Expression Tests
+test_groupByP :: Test
+test_groupByP =
+  "parsing GROUP BY expressions"
+    ~: TestList
+      [ groupByP "group by col1" ~?= Right ["col1"],
+        groupByP "group by col1, col2" ~?= Right ["col1", "col2"],
+        groupByP "group by" ~?= Left "No columns selected to Group By",
+        groupByP "hello world" ~?= Left "No parses"
+      ]
+
+test_orderByP :: Test
+test_orderByP =
+  "parsing ORDER BY clauses"
+    ~: TestList
+      [ orderByP "arbitrary_string" ~?= Left "no parses",
+        orderByP "order by" ~?= Left "Error: incomplete Order By expression",
+        orderByP "order by col0" ~?= Right ("col0", Asc),
+        orderByP "order by col2 asc" ~?= Right ("col2", Asc),
+        orderByP "order by col1 desc" ~?= Right ("col1", Desc),
+        orderByP "order by col1 wrongOrder" ~?= Left "Error: invalid sort order",
+        orderByP "order by nonexistentCol wrongOrder" ~?= Left "Error: invalid sort order",
+        orderByP "order by col1, col2 asc" ~?= Left "Error: too many tokens in Order By expression",
+        orderByP "order by col1, col2, col3 desc" ~?= Left "Error: too many tokens in Order By expression"
+      ]
+
+-- >>> runTestTT test_orderByP
+
 test_parseQuerySimple :: Test
 test_parseQuerySimple =
   "simple SQL SELECT & FROM queries"
@@ -65,47 +93,38 @@ test_parseQuerySimple =
 
 -- >>> runTestTT test_selectExpP
 
--- test_fromExpP :: Test
--- test_fromExpP =
---   "parsing FROM expressions"
---     ~: TestList
---       [ P.parse fromExpP "FROM A" ~?= Right (TableName "A" Nothing),
---         P.parse fromExpP "FROM A JOIN B ON A.col = B.col"
---           ~?= Right
---             ( TableName
---                 "A"
---                 ( Just $
---                     Join
---                       { leftTable = "A",
---                         leftCol = "col",
---                         rightTable = "B",
---                         rightCol = "col",
---                         style = InnerJoin
---                       }
---                 )
---             ),
---         P.parse fromExpP "FROM (SELECT col FROM B)"
---           ~?= Right
---             ( SubQuery
---                 Query
---                   { select = Cols [Col "col"],
---                     from = Table "B" Nothing,
---                     wher = Nothing,
---                     groupBy = Nothing,
---                     limit = Nothing,
---                     orderBy = Nothing
---                   }
---                 Nothing
---             )
---       ]
-
-test_orderP :: Test
-test_orderP =
-  "parsing ORDER BY clauses"
+test_fromExpP :: Test
+test_fromExpP =
+  "parsing FROM expressions"
     ~: TestList
-      [ P.parse orderP "ORDER BY col0" ~?= Right ("col0", Asc),
-        P.parse orderP "ORDER BY col2 ASC" ~?= Right ("col2", Asc),
-        P.parse orderP "ORDER BY col1 DESC" ~?= Right ("col1", Desc)
+      [ fromExpP "from A" ~?= Right (Table "A" Nothing),
+        fromExpP "from A join B on a.col = b.col"
+          ~?= Right
+            ( Table
+                "A"
+                ( Just $
+                    Join
+                      { leftTable = "A",
+                        leftCol = "col",
+                        rightTable = "B",
+                        rightCol = "col",
+                        style = InnerJoin
+                      }
+                )
+            ),
+        fromExpP "FROM (SELECT col FROM B)"
+          ~?= Right
+            ( SubQuery
+                Query
+                  { select = Cols [Col "col"],
+                    from = Table "B" Nothing,
+                    wher = Nothing,
+                    groupBy = Nothing,
+                    limit = Nothing,
+                    orderBy = Nothing
+                  }
+                Nothing
+            )
       ]
 
 test_doubleValP :: Test

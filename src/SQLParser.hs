@@ -176,8 +176,15 @@ parseSelectAttr str =
 fromTokenP :: Parser ()
 fromTokenP = stringP "from"
 
-fromExpP :: Parser FromExp
-fromExpP = undefined
+-- Parse FROM expressions
+fromExpP :: String -> Either P.ParseError FromExp
+fromExpP str = case P.doParse fromTokenP str of
+  Nothing -> Left "No parses"
+  Just ((), remainderStr) ->
+    let tables = map stripSpace (splitOnDelims [",", " "] remainderStr)
+     in case tables of
+          [] -> Left "No table selected FROM"
+          hd : tl -> Right $ Table hd Nothing
 
 whereTokenP :: Parser ()
 whereTokenP = stringP "where"
@@ -185,8 +192,41 @@ whereTokenP = stringP "where"
 groupByTokenP :: Parser ()
 groupByTokenP = stringP "group by"
 
+-- Parse GROUP BY expressions
+groupByP :: String -> Either P.ParseError [ColName]
+groupByP str = case P.doParse groupByTokenP str of
+  Nothing -> Left "No parses"
+  Just ((), remainderStr) ->
+    let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
+     in case cols of
+          [] -> Left "No columns selected to Group By"
+          hd : tl -> Right cols
+
 orderByTokenP :: Parser ()
 orderByTokenP = stringP "order by"
+
+-- Parse ORDER BY expressions
+-- Note: we specify that we can only sort by one column
+orderByP :: String -> Either P.ParseError (ColName, Order)
+orderByP str =
+  case P.doParse orderByTokenP str of
+    Nothing -> Left "no parses"
+    Just ((), remainder) ->
+      let orderByExp = map stripSpace (splitOnDelims [",", " "] remainder)
+       in case orderByExp of
+            [] -> Left "Error: incomplete Order By expression"
+            [col] -> Right (col, Asc)
+            [col, order] ->
+              case stringToOrder order of
+                Just ord -> Right (col, ord)
+                Nothing -> Left "Error: invalid sort order"
+            _ -> Left "Error: too many tokens in Order By expression"
+
+-- Helper function: converts a string representing a sort order to an Order
+stringToOrder :: String -> Maybe Order
+stringToOrder "asc" = Just Asc
+stringToOrder "desc" = Just Desc
+stringToOrder _ = Nothing
 
 -- QUESTION FOR JOE: Is the type of the limitP parser bad (since it parses a function?)
 -- Parses the "Limit" token & the subsequent integer
@@ -204,9 +244,6 @@ limitP = constP "limit" Limit
 --       limit = Nothing,
 --       orderBy = Nothing
 --     }
-
-orderP :: Parser (ColName, Order)
-orderP = undefined
 
 joinStyleP :: Parser JoinStyle
 joinStyleP = undefined
