@@ -80,6 +80,7 @@ genComparable =
 
 -- TODO: how to avoid leftTable & rightTable being the same?
 -- (write a generator for pairs of distinct TableNames??)
+
 -- Generator for Join Expressions
 instance Arbitrary JoinExp where
   arbitrary = do

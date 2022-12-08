@@ -151,32 +151,27 @@ selectExpP str =
 selectExpHelper :: [String] -> [ColExp]
 selectExpHelper strs = rights (map parseSelectAttr strs)
 
--- >>> P.doParse selectTokenP "select count(col1)"
--- Just ((),"count(col1)")
-
--- >>> map stripSpace (splitOnDelims [",", " "] "count(col1)")
--- ["count(col1)"]
-
--- >>> rights (map parseSelectAttr ["count(col1)"])
-
 -- Split a string on multiple delimiters
--- (We use foldl' to force the accumulator argument to be evaluated immediately)
+-- (Use foldl' to force the accumulator argument to be evaluated immediately)
 splitOnDelims :: [String] -> String -> [String]
-splitOnDelims delims str = filter (not . null) (foldl' (\xs delim -> concatMap (splitOn delim) xs) [str] delims)
-
--- >>> splitOnDelims ["(", ")"] "count(col1)"
+splitOnDelims delims str =
+  filter
+    (not . null)
+    (foldl' (\xs delim -> concatMap (splitOn delim) xs) [str] delims)
 
 -- Parses a single string as a ColExp
+-- (If there's a function call,
+-- split the string on parens to identify the aggregate function & column)
 parseSelectAttr :: String -> Either P.ParseError ColExp
 parseSelectAttr str =
   let newStrs = splitOnDelims ["(", ")"] str
    in case newStrs of
         [col] -> Col <$> P.parse colNameP str
-        agg : cols -> if agg `elem` aggFuncNames then map (P.parse (aggFuncTokenP <*> parens colNameP)) cols else undefined
-        _ -> Left "error, tried to parse empty string"
-
--- str `elem` aggFuncNames = P.parse (aggFuncTokenP <*> parens colNameP) str
--- otherwise = Col <$> P.parse colNameP str
+        [agg, col] ->
+          if agg `elem` aggFuncNames
+            then P.parse (aggFuncTokenP <*> parens colNameP) str
+            else Left "Error: tried to call undefined function on a column"
+        _ -> Left "Error: Malformed SelectExp"
 
 fromTokenP :: Parser ()
 fromTokenP = stringP "from"

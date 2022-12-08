@@ -44,6 +44,9 @@ test_selectExpP =
           ~?= Right (Cols [SQL.Agg Count "col1"])
       ]
 
+-- >>> runTestTT test_selectExpP
+-- Counts {cases = 5, tried = 5, errors = 0, failures = 1}
+
 test_parseQuerySimple :: Test
 test_parseQuerySimple =
   "simple SQL SELECT & FROM queries"

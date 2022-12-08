@@ -42,8 +42,7 @@ joinExpToMerge = undefined
 -- Converts "SELECT" expressions in SQL to a list of colnames in Pandas
 selectExpToCols :: SelectExp -> [ColName]
 selectExpToCols Star = []
-
-selectExpToCol selectE = undefined "TODO"
+selectExpToCols _ = undefined "TODO"
 
 -- Converts "WHERE" expressions in SQL to "loc" function in Pandas
 whereExpToLoc :: BoolExp -> Func
