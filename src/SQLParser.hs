@@ -183,8 +183,25 @@ fromExpP str = case P.doParse fromTokenP str of
   Just ((), remainderStr) ->
     let tables = map stripSpace (splitOnDelims [",", " "] remainderStr)
      in case tables of
-          [] -> Left "No table selected FROM"
-          hd : tl -> Right $ Table hd Nothing
+          [] -> Left "No table selected in FROM expression"
+          [tableName] -> Right $ Table tableName Nothing
+          hd : tl -> undefined "TODO"
+
+-- >>> fromExpP "from a join b on a.col = b.col"
+-- Prelude.undefined
+
+-- >>> P.doParse fromTokenP "from a join b on a.col = b.col"
+-- Just ((),"a join b on a.col = b.col")
+
+-- TODO: delete
+remainderStr :: String
+remainderStr = "a join b on a.col = b.col"
+
+tables :: [String]
+tables = ["a", "join", "b", "on", "a.col", "=", "b.col"]
+
+-- >>> map stripSpace (splitOnDelims [",", " "] remainderStr)
+-- ["a","join","b","on","a.col","=","b.col"]
 
 whereTokenP :: Parser ()
 whereTokenP = stringP "where"

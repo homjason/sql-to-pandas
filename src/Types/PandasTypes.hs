@@ -46,7 +46,7 @@ data Func
   | SortValues ColName Order
   | Rename (Map ColName ColName)
   | GroupBy [ColName]
-  | Agg AggFunc ColName ColName
+  | Aggregate AggFunc ColName ColName
   | Loc BoolExp -- filtering on rows (akin to WHERE in SQL)
   | Merge MergeExp
   | Unique [ColName]

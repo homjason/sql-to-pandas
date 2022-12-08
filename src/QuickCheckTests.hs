@@ -18,13 +18,20 @@ import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
 
+-- TODO: fix!
 genSelectExp :: Gen SelectExp
 genSelectExp =
   QC.oneof
     [ Cols <$> genColName,
       DistinctCols <$> genColName,
-      genAgg,
       return EmptySelect
+    ]
+
+genColExp :: Gen ColExp
+genColExp =
+  QC.oneof
+    [ Col <$> genColName,
+      genAgg
     ]
 
 -- List of permitted colnames
@@ -44,12 +51,10 @@ genTableName :: Gen TableName
 genTableName = QC.elements tableNames
 
 -- Generator for Aggregate Function Expressions in SELECT
-genAgg :: Gen SelectExp
+genAgg :: Gen ColExp
 genAgg = do
-  fn <- genAggFunc
-  col <- genColName
-  let newCol = col ++ "_agg"
-  return $ Agg fn col newCol
+  fn <- arbitrary
+  Agg fn <$> genColName
 
 -- Generator for FROM expressions
 genFromExp :: Gen FromExp
@@ -113,19 +118,19 @@ genRow = undefined
 
 -- | Generator for strings of length <= 10 that only contain letters a-d (from HW4)
 genSmallString :: Gen String
-genSmallString = resize 10 (listOf (elements "abcd"))
+genSmallString = QC.resize 10 (QC.listOf (QC.elements "abcd"))
 
 -- | Generator that produces small lists of non-empty strings
 genSmallNonEmptyStringLists :: Gen String
-genSmallNonEmptyStringLists = resize 15 $ listOf1 arbitrary
+genSmallNonEmptyStringLists = QC.resize 15 $ QC.listOf1 arbitrary
 
 -- Generator for small Ints (between 0 & 5)
 genSmallInt :: Gen Int
-genSmallInt = chooseInt (0, 5)
+genSmallInt = QC.chooseInt (0, 5)
 
 -- Generator for small Doubles (between 0.00 & 50.00)
 genSmallDouble :: Gen Double
-genSmallDouble = choose (0.00 :: Double, 50.00 :: Double)
+genSmallDouble = QC.choose (0.00 :: Double, 50.00 :: Double)
 
 ----------------------------------------------------
 -- Arbitrary instances for Enum types
@@ -195,12 +200,12 @@ getPandasTable = undefined
 -- QUESTION FOR JOE: clarify how generics works???
 -- Reference:
 -- https://stackoverflow.com/questions/62580560/how-to-check-if-all-of-the-maybe-fields-in-a-haskell-record-are-nothing
-fieldsAreNothing :: (Data d) => d -> Bool
-fieldsAreNothing = and . gmapQ (const True `ext1Q` isNothing)
+-- fieldsAreNothing :: (Data d) => d -> Bool
+-- fieldsAreNothing = and . gmapQ (const True `ext1Q` isNothing)
 
-irrelevantFieldsAreNothing :: (Data d) => d -> Maybe d
-irrelevantFieldsAreNothing x =
-  if fieldsAreNothing x then Nothing else Just x
+-- irrelevantFieldsAreNothing :: (Data d) => d -> Maybe d
+-- irrelevantFieldsAreNothing x =
+--   if fieldsAreNothing x then Nothing else Just x
 
 -- checkTableEquality :: Table --> Table
 -- checkTableEquality t1 t2 = Data.List.sort t1 == Data.List.sort t2

@@ -41,7 +41,7 @@ instance PP Func where
   pp (SortValues cName o) = undefined
   pp (Rename colNameMap) = undefined
   pp (GroupBy colNames) = undefined
-  pp (Pandas.Agg fn col newCol) = undefined
+  pp (Pandas.Aggregate fn col newCol) = undefined
   pp (Loc boolExp) = undefined
   pp (Merge mergeExp) = undefined
   pp (Unique colNames) = undefined

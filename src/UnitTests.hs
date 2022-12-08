@@ -91,28 +91,29 @@ test_parseQuerySimple =
               }
       ]
 
--- >>> runTestTT test_selectExpP
+-- >>> runTestTT test_fromExpP
+-- Counts {cases = 3, tried = 3, errors = 0, failures = 2}
 
 test_fromExpP :: Test
 test_fromExpP =
   "parsing FROM expressions"
     ~: TestList
       [ fromExpP "from A" ~?= Right (Table "A" Nothing),
-        fromExpP "from A join B on a.col = b.col"
+        fromExpP "from a join b on a.col = b.col"
           ~?= Right
             ( Table
                 "A"
                 ( Just $
                     Join
-                      { leftTable = "A",
+                      { leftTable = "a",
                         leftCol = "col",
-                        rightTable = "B",
+                        rightTable = "b",
                         rightCol = "col",
                         style = InnerJoin
                       }
                 )
             ),
-        fromExpP "FROM (SELECT col FROM B)"
+        fromExpP "from (select col from B)"
           ~?= Right
             ( SubQuery
                 Query
