@@ -3,7 +3,8 @@ module SQLParser where
 import Control.Applicative
 import Data.Char (isSpace, toLower)
 import Data.Either (rights)
-import Data.List (dropWhileEnd)
+import Data.Functor (($>))
+import Data.List (dropWhileEnd, foldl')
 import Data.List.Split (splitOn)
 import Parser (Parser)
 import Parser qualified as P
@@ -24,12 +25,12 @@ wsP p = p <* many P.space
 
 -- | Accepts only a particular string s & consumes any white space that follows
 stringP :: String -> Parser ()
-stringP str = wsP (P.string str) *> pure ()
+stringP str = wsP (P.string str) $> ()
 
 -- | Accepts a particular string s, returns a given value x,
 -- and consume any white space that follows.
 constP :: String -> a -> Parser a
-constP s x = stringP s *> pure x
+constP s x = stringP s $> x
 
 -- | Parses between parentheses
 parens :: Parser a -> Parser a
@@ -124,11 +125,11 @@ aggFuncNames :: [String]
 aggFuncNames = ["count", "avg", "sum", "min", "max"]
 
 -- Strips leading/trailing whitespace from a string
--- https://stackoverflow.com/questions/6270324/in-haskell-how-do-you-trim-whitespace-from-the-beginning-and-end-of-a-string
 stripSpace :: String -> String
 stripSpace = dropWhileEnd isSpace . dropWhile isSpace
 
 -- >>> stripSpace "     hello world "
+-- "hello world"
 
 -- Parses a string corresponding to a SELECT expression
 selectExpP :: String -> Either P.ParseError SelectExp
@@ -139,7 +140,7 @@ selectExpP str =
       case remainderStr of
         "*" -> Right Star
         _ ->
-          let cols = map stripSpace (splitOn "," remainderStr)
+          let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
            in case cols of
                 [] -> Left "No columns selected to Query"
                 hd : tl -> case hd of
@@ -150,14 +151,38 @@ selectExpP str =
 selectExpHelper :: [String] -> [ColExp]
 selectExpHelper strs = rights (map parseSelectAttr strs)
 
+-- >>> P.doParse selectTokenP "select count(col1)"
+-- Just ((),"count(col1)")
+
+-- >>> map stripSpace (splitOnDelims [",", " "] "count(col1)")
+-- ["count(col1)"]
+
+-- >>> rights (map parseSelectAttr ["count(col1)"])
+
+-- Split a string on multiple delimiters
+-- (We use foldl' to force the accumulator argument to be evaluated immediately)
+splitOnDelims :: [String] -> String -> [String]
+splitOnDelims delims str = filter (not . null) (foldl' (\xs delim -> concatMap (splitOn delim) xs) [str] delims)
+
+-- >>> splitOnDelims ["(", ")"] "count(col1)"
+
 -- Parses a single string as a ColExp
 parseSelectAttr :: String -> Either P.ParseError ColExp
-parseSelectAttr str
-  | str `elem` aggFuncNames = P.parse (aggFuncTokenP <*> parens colNameP) str
-  | otherwise = Col <$> P.parse colNameP str
+parseSelectAttr str =
+  let newStrs = splitOnDelims ["(", ")"] str
+   in case newStrs of
+        [col] -> Col <$> P.parse colNameP str
+        agg : cols -> if agg `elem` aggFuncNames then map (P.parse (aggFuncTokenP <*> parens colNameP)) cols else undefined
+        _ -> Left "error, tried to parse empty string"
+
+-- str `elem` aggFuncNames = P.parse (aggFuncTokenP <*> parens colNameP) str
+-- otherwise = Col <$> P.parse colNameP str
 
 fromTokenP :: Parser ()
 fromTokenP = stringP "from"
+
+fromExpP :: Parser FromExp
+fromExpP = undefined
 
 whereTokenP :: Parser ()
 whereTokenP = stringP "where"
@@ -187,9 +212,6 @@ limitP = constP "limit" Limit
 
 orderP :: Parser (ColName, Order)
 orderP = undefined
-
-fromExpP :: Parser FromExp
-fromExpP = undefined
 
 joinStyleP :: Parser JoinStyle
 joinStyleP = undefined
@@ -232,6 +254,8 @@ parseQuery = undefined "wsP $ selectExpP <|> fromExpP"
 -- Converts query string to lower case & splits on new lines
 splitQueryString :: String -> [String]
 splitQueryString str = lines (map toLower str)
+
+-- >>> splitQueryString "SELECT DISTINCT col"
 
 -- Parses a SQL file (takes in filename of the SQL file)
 -- Returns either a ParseError (Left) or a Query (Right)
