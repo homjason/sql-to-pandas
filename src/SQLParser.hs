@@ -36,10 +36,10 @@ constP s x = stringP s $> x
 parens :: Parser a -> Parser a
 parens x = P.between (stringP "(") x (stringP ")")
 
--- | Parses colnames (any sequence of upper and lowercase letters, digits &
+-- | Parses tablenames / colnames (any sequence of upper and lowercase letters, digits &
 -- underscores, not beginning with a digit and not being a reserved word)
-colNameP :: Parser ColName
-colNameP = P.filter (`notElem` reserved) (wsP $ liftA2 (:) startChar $ many remainingChars)
+nameP :: Parser String
+nameP = P.filter (`notElem` reserved) (wsP $ liftA2 (:) startChar $ many remainingChars)
   where
     startChar = P.alpha <|> P.char '_'
     remainingChars = startChar <|> P.digit
@@ -166,15 +166,24 @@ parseSelectAttr :: String -> Either P.ParseError ColExp
 parseSelectAttr str =
   let newStrs = splitOnDelims ["(", ")"] str
    in case newStrs of
-        [col] -> Col <$> P.parse colNameP str
+        [col] -> Col <$> P.parse nameP str
         [agg, col] ->
           if agg `elem` aggFuncNames
-            then P.parse (aggFuncTokenP <*> parens colNameP) str
+            then P.parse (aggFuncTokenP <*> parens nameP) str
             else Left "Error: tried to call undefined function on a column"
         _ -> Left "Error: Malformed SelectExp"
 
+-- Parses the token "from", consumes subsequent whitespace
 fromTokenP :: Parser ()
 fromTokenP = stringP "from"
+
+-- Parses the token "join", consumes subsequent whitespace
+joinTokenP :: Parser ()
+joinTokenP = stringP "join"
+
+-- Parses the token "on", consumes subsequent whitespace
+onTokenP :: Parser ()
+onTokenP = stringP "on"
 
 -- Parse FROM expressions
 fromExpP :: String -> Either P.ParseError FromExp
@@ -187,8 +196,14 @@ fromExpP str = case P.doParse fromTokenP str of
           [tableName] -> Right $ Table tableName Nothing
           hd : tl -> undefined "TODO"
 
--- >>> fromExpP "from a join b on a.col = b.col"
--- Prelude.undefined
+-- TODO: update type to be Parser JoinExp
+-- This currently parses the thing "a join b on"
+-- Need to make this also parse the string "a.col = b.col"
+joinExpP :: Parser String
+joinExpP = nameP <* joinTokenP *> nameP <* onTokenP *> nameP
+
+-- >>> P.doParse joinExpP "a join b on a.col"
+-- Just ("a",".col")
 
 -- >>> P.doParse fromTokenP "from a join b on a.col = b.col"
 -- Just ((),"a join b on a.col = b.col")
@@ -197,11 +212,9 @@ fromExpP str = case P.doParse fromTokenP str of
 remainderStr :: String
 remainderStr = "a join b on a.col = b.col"
 
+-- TODO: delete
 tables :: [String]
 tables = ["a", "join", "b", "on", "a.col", "=", "b.col"]
-
--- >>> map stripSpace (splitOnDelims [",", " "] remainderStr)
--- ["a","join","b","on","a.col","=","b.col"]
 
 whereTokenP :: Parser ()
 whereTokenP = stringP "where"
@@ -267,10 +280,6 @@ joinStyleP = undefined
 
 comparableP :: Parser Comparable
 comparableP = undefined
-
--- Parses Join expressions
-joinExpP :: Parser JoinExp
-joinExpP = undefined
 
 -- Parses Where expressions
 whereExpP :: Parser BoolExp
