@@ -2,7 +2,7 @@
 
 {-# HLINT ignore "Use lambda-case" #-}
 
--- | A small, applicative-based parsing library
+-- | A small, applicative-based parsing library (from HW5)
 -- NOTE: this library does not export the `P` data constructor.
 -- All `Parser`s must be built using the following functions
 -- exported by this file, as well as the `Functor`, `Applicative` and

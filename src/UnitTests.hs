@@ -29,22 +29,22 @@ test_splitOnDelims =
         splitOnDelims [",", " "] "" ~?= []
       ]
 
-test_selectExpP :: Test
-test_selectExpP =
+test_parseSelectExp :: Test
+test_parseSelectExp =
   "parsing SELECT expressions"
     ~: TestList
-      [ selectExpP "select col1" ~?= Right (Cols [Col "col1"]),
-        selectExpP "select col1, col2, col3"
+      [ parseSelectExp "select col1" ~?= Right (Cols [Col "col1"]),
+        parseSelectExp "select col1, col2, col3"
           ~?= Right (Cols [Col "col1", Col "col2", Col "col3"]),
-        selectExpP "select distinct col1"
+        parseSelectExp "select distinct col1"
           ~?= Right (DistinctCols [Col "col1"]),
-        selectExpP "select distinct col1, col2, col3"
+        parseSelectExp "select distinct col1, col2, col3"
           ~?= Right (DistinctCols [Col "col1", Col "col2", Col "col3"]),
-        selectExpP "select count(col1)"
+        parseSelectExp "select count(col1)"
           ~?= Right (Cols [SQL.Agg Count "col1"])
       ]
 
--- >>> runTestTT test_selectExpP
+-- >>> runTestTT test_parseSelectExp
 -- Counts {cases = 5, tried = 5, errors = 0, failures = 1}
 
 -- GROUP BY Expression Tests
@@ -91,18 +91,18 @@ test_parseQuerySimple =
               }
       ]
 
--- >>> runTestTT test_fromExpP
+-- >>> runTestTT test_parseFromExp
 -- Counts {cases = 3, tried = 3, errors = 0, failures = 2}
 
-test_fromExpP :: Test
-test_fromExpP =
+test_parseFromExp :: Test
+test_parseFromExp =
   "parsing FROM expressions"
     ~: TestList
-      [ fromExpP "from A" ~?= Right (Table "A" Nothing),
-        fromExpP "from a join b on a.col = b.col"
+      [ parseFromExp "from A" ~?= Right (Table "A" Nothing),
+        parseFromExp "from a join b on a.col = b.col"
           ~?= Right
             ( Table
-                "A"
+                "a"
                 ( Just $
                     Join
                       { leftTable = "a",
@@ -113,19 +113,63 @@ test_fromExpP =
                       }
                 )
             ),
-        fromExpP "from (select col from B)"
+        parseFromExp "from df1 left join df2 on df1.col1 = df2.col2"
           ~?= Right
-            ( SubQuery
-                Query
-                  { select = Cols [Col "col"],
-                    from = Table "B" Nothing,
-                    wher = Nothing,
-                    groupBy = Nothing,
-                    limit = Nothing,
-                    orderBy = Nothing
-                  }
-                Nothing
+            ( Table
+                "df1"
+                ( Just $
+                    Join
+                      { leftTable = "df1",
+                        leftCol = "col1",
+                        rightTable = "df2",
+                        rightCol = "col2",
+                        style = LeftJoin
+                      }
+                )
             )
+            -- parseFromExp "from (select col from B)"
+            --   ~?= Right
+            --     ( SubQuery
+            --         Query
+            --           { select = Cols [Col "col"],
+            --             from = Table "B" Nothing,
+            --             wher = Nothing,
+            --             groupBy = Nothing,
+            --             limit = Nothing,
+            --             orderBy = Nothing
+            --           }
+            --         Nothing
+            --     )
+      ]
+
+test_parseJoinExp :: Test
+test_parseJoinExp =
+  "parsing join expressions"
+    ~: TestList
+      [ parseJoinExp "a join b on a.col = b.col"
+          ~?= Right (Join {leftTable = "a", leftCol = "col", rightTable = "b", rightCol = "col", style = InnerJoin}),
+        parseJoinExp "a left join b on a.col = b.col"
+          ~?= Right (Join {leftTable = "a", leftCol = "col", rightTable = "b", rightCol = "col", style = LeftJoin}),
+        parseJoinExp "a right join b on a.col = b.col"
+          ~?= Right (Join {leftTable = "a", leftCol = "col", rightTable = "b", rightCol = "col", style = RightJoin}),
+        parseJoinExp "a left join b"
+          ~?= Left "No join condition specified",
+        parseJoinExp "a join b on c.col = d.col"
+          ~?= Left "Tables being JOINed != tables being selected FROM",
+        parseJoinExp "a join a on a.col = a.col"
+          ~?= Left "Can't join the same table with itself",
+        parseJoinExp "a join a on a.col = b.col"
+          ~?= Left "Can't join the same table with itself",
+        parseJoinExp "a join b"
+          ~?= Left "No join condition specified",
+        parseJoinExp "a join b on a.col = b.col arbitrarySuffix"
+          ~?= Left "Invalid JOIN expression",
+        parseJoinExp "a invalidJoin b on a.col = b.col"
+          ~?= Left "No parses",
+        parseJoinExp "a join b on aCol = bCol"
+          ~?= Left "Malformed JOIN condition",
+        parseJoinExp "a join b on c"
+          ~?= Left "No parses"
       ]
 
 test_doubleValP :: Test

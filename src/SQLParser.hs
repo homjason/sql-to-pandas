@@ -1,6 +1,7 @@
 module SQLParser where
 
 import Control.Applicative
+import Control.Monad
 import Data.Char (isSpace, toLower)
 import Data.Either (rights)
 import Data.Functor (($>))
@@ -15,34 +16,45 @@ import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
 
+-- Use a parser for a particular string
+-- (Modification of P.parser in Parser.hs that returns
+-- both the parsed string & the remainder of the string)
+parseResult :: Parser a -> String -> Either P.ParseError (a, String)
+parseResult parser str = case P.doParse parser str of
+  Nothing -> Left "No parses"
+  Just (a, remainder) -> Right (a, remainder)
+
 -- | Takes a parser, runs it, & skips over any whitespace characters occurring
--- afterwards
+-- afterwards (from HW5)
 wsP :: Parser a -> Parser a
 wsP p = p <* many P.space
 
--- QUESTION FOR JOE: Hlint says we should use $> instead of *>, how do
--- we stop Hlint from complaining?
-
 -- | Accepts only a particular string s & consumes any white space that follows
+-- (from HW5)
 stringP :: String -> Parser ()
 stringP str = wsP (P.string str) $> ()
 
 -- | Accepts a particular string s, returns a given value x,
--- and consume any white space that follows.
+-- and consume any white space that follows (from HW5)
 constP :: String -> a -> Parser a
 constP s x = stringP s $> x
 
--- | Parses between parentheses
+-- | Parses between parentheses (from HW5)
 parens :: Parser a -> Parser a
 parens x = P.between (stringP "(") x (stringP ")")
 
--- | Parses tablenames / colnames (any sequence of upper and lowercase letters, digits &
--- underscores, not beginning with a digit and not being a reserved word)
+-- Parses periods
+dotP :: Parser Char
+dotP = P.satisfy (== '.')
+
+-- | Parses tablenames / colnames (any sequence of upper & lowercase letters, digits,
+-- underscores & periods, not beginning with a digit and not being a reserved word)
+-- (modified from HW5)
 nameP :: Parser String
 nameP = P.filter (`notElem` reserved) (wsP $ liftA2 (:) startChar $ many remainingChars)
   where
     startChar = P.alpha <|> P.char '_'
-    remainingChars = startChar <|> P.digit
+    remainingChars = startChar <|> P.digit <|> dotP
 
 -- Reserved keywords in SQL
 reserved :: [String]
@@ -107,11 +119,11 @@ stringValP = StringVal <$> P.between (P.char '\"') (many $ P.satisfy (/= '\"')) 
 -- isNotNullTokenP :: Parser (ColName -> NullOp)
 -- isNotNullTokenP = constP "is not null" IsNotNull
 
--- Parses the SELECT token
+-- | Parses the SELECT token
 selectTokenP :: Parser ()
 selectTokenP = stringP "select"
 
--- Parses the names of aggregate functions and returns a function from ColName -> ColExp
+-- | Parses the names of aggregate functions and returns a function from ColName -> ColExp
 aggFuncTokenP :: Parser (ColName -> ColExp)
 aggFuncTokenP =
   constP "count" (Agg Count)
@@ -120,20 +132,17 @@ aggFuncTokenP =
     <|> constP "min" (Agg Min)
     <|> constP "max" (Agg Max)
 
--- Names of aggregate functions
+-- | Names of aggregate functions in SQL/Pandas
 aggFuncNames :: [String]
 aggFuncNames = ["count", "avg", "sum", "min", "max"]
 
--- Strips leading/trailing whitespace from a string
+-- | Strips leading/trailing whitespace from a string
 stripSpace :: String -> String
 stripSpace = dropWhileEnd isSpace . dropWhile isSpace
 
--- >>> stripSpace "     hello world "
--- "hello world"
-
--- Parses a string corresponding to a SELECT expression
-selectExpP :: String -> Either P.ParseError SelectExp
-selectExpP str =
+-- | Parses a string corresponding to a SELECT expression
+parseSelectExp :: String -> Either P.ParseError SelectExp
+parseSelectExp str =
   case P.doParse selectTokenP str of
     Nothing -> Left "No parses"
     Just ((), remainderStr) ->
@@ -147,7 +156,7 @@ selectExpP str =
                   "distinct" -> Right $ DistinctCols (selectExpHelper tl)
                   _ -> Right $ Cols (selectExpHelper cols)
 
--- Split a string on multiple delimiters
+-- | Split a string on multiple delimiters
 -- (Use foldl' to force the accumulator argument to be evaluated immediately)
 splitOnDelims :: [String] -> String -> [String]
 splitOnDelims delims str =
@@ -155,11 +164,11 @@ splitOnDelims delims str =
     (not . null)
     (foldl' (\xs delim -> concatMap (splitOn delim) xs) [str] delims)
 
--- Recursive helper for iterating over list of colnames
+-- | Recursive helper for iterating over list of colnames
 selectExpHelper :: [String] -> [ColExp]
 selectExpHelper strs = rights (map parseSelectAttr strs)
 
--- Parses a single string as a ColExp
+-- | Parses a single string as a ColExp
 -- (If there's a function call,
 -- split the string on parens to identify the aggregate function & column)
 parseSelectAttr :: String -> Either P.ParseError ColExp
@@ -173,69 +182,67 @@ parseSelectAttr str =
             else Left "Error: tried to call undefined function on a column"
         _ -> Left "Error: Malformed SelectExp"
 
--- Parses the token "from", consumes subsequent whitespace
+-- | Parses the token "from", consumes subsequent whitespace
 fromTokenP :: Parser ()
 fromTokenP = stringP "from"
 
--- Parses the token "join", consumes subsequent whitespace
-joinTokenP :: Parser ()
-joinTokenP = stringP "join"
-
--- Parses the token "on", consumes subsequent whitespace
+-- | Parses the token "on", consumes subsequent whitespace
 onTokenP :: Parser ()
 onTokenP = stringP "on"
 
--- Parse FROM expressions
-fromExpP :: String -> Either P.ParseError FromExp
-fromExpP str = case P.doParse fromTokenP str of
-  Nothing -> Left "No parses"
-  Just ((), remainderStr) ->
-    let tables = map stripSpace (splitOnDelims [",", " "] remainderStr)
-     in case tables of
-          [] -> Left "No table selected in FROM expression"
-          [tableName] -> Right $ Table tableName Nothing
-          leftT : joinTok : rightT : onTok : leftTabCol : eqTok : rightTabCol : tl -> undefined
-          _ -> undefined
+-- | Parses the equal sign
+eqTokenP :: Parser ()
+eqTokenP = stringP "="
 
--- TODO: update type to be Parser JoinExp
--- This currently parses the thing "a join b on"
--- Need to make this also parse the string "a.col = b.col"
-joinExpP :: Parser String
-joinExpP = nameP <* joinTokenP *> nameP <* onTokenP
+-- | Parses commands indicating the style of the join
+joinTokenP :: Parser JoinStyle
+joinTokenP =
+  constP "join" InnerJoin
+    <|> constP "left join" LeftJoin
+    <|> constP "right join" RightJoin
 
-leftTableP :: Parser TableName
-leftTableP = nameP <* joinTokenP
+-- | Parses FROM expressions
+-- TODO: handle subqueries!
+parseFromExp :: String -> Either P.ParseError FromExp
+parseFromExp str = case P.doParse fromTokenP str of
+  Nothing -> Left "Error: No parses, malformed FROM expression"
+  Just ((), remainder) ->
+    case words remainder of
+      [] -> Left "Error: No table selected in FROM expression"
+      [tableName] -> Right $ Table tableName Nothing
+      _ -> case parseJoinExp remainder of
+        Right joinExp@(Join leftT _ _ _ _) -> Right $ Table leftT (Just joinExp)
+        Left errorMsg -> Left errorMsg
 
--- Parses
-tableColP :: Parser String
-tableColP = nameP <* stringP "."
-
-resolveTableCol :: String -> Maybe (TableName, ColName)
-resolveTableCol str = do
-  (table, col) <- P.doParse tableColP str
-  return (table, col)
-
-parseJoinAttr :: String -> JoinExp
-parseJoinAttr str = do
-  -- (leftT, remainderStr) <- P.doParse leftTableP str
-  undefined
-
--- >>> P.doParse tableColP "a.col"
--- Just ("a","col")
-
--- >>> P.doParse joinExpP "a join b on"
--- Just ("a",".col")
-
--- >>> P.doParse fromTokenP "from a join b on a.col = b.col"
--- Just ((),"a join b on a.col = b.col")
-
--- TODO: delete
-remainderStr :: String
-remainderStr = "a join b on a.col = b.col"
-
--- TODO: delete
-tables :: [String]
-tables = ["a", "join", "b", "on", "a.col", "=", "b.col"]
+-- | Parses JOIN expressions
+-- (resolves the two tables & columns partaking in the join)
+-- For simplicity, we explciitly disallow joining the same table with itself
+parseJoinExp :: String -> Either P.ParseError JoinExp
+parseJoinExp str = do
+  (leftT, s') <- parseResult nameP str
+  (joinStyle, s'') <- parseResult joinTokenP s'
+  (rightT, joinCond) <- parseResult nameP s''
+  when (null joinCond) (Left "No join condition specified")
+  (leftTC, remainder) <- parseResult (onTokenP *> nameP) joinCond
+  (rightTC, tl) <- parseResult (eqTokenP *> nameP) remainder
+  unless (null tl) (Left "Invalid JOIN expression")
+  case (splitOn "." leftTC, splitOn "." rightTC) of
+    ([leftT', leftC], [rightT', rightC]) -> do
+      when
+        (leftT == rightT || leftT' == rightT')
+        (Left "Can't join the same table with itself")
+      unless
+        (leftT == leftT' && rightT == rightT')
+        (Left "Tables being JOINed != tables being selected FROM")
+      Right $
+        Join
+          { leftTable = leftT,
+            leftCol = leftC,
+            rightTable = rightT,
+            rightCol = rightC,
+            style = joinStyle
+          }
+    (_, _) -> Left "Malformed JOIN condition"
 
 whereTokenP :: Parser ()
 whereTokenP = stringP "where"
