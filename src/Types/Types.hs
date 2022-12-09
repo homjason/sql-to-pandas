@@ -19,7 +19,9 @@ data Order = Asc | Desc
 data BoolExp
   = OpC Comparable CompOp Comparable -- Comparison operations
   | OpA Comparable ArithOp Comparable -- Arithmetic Operations
-  | OpL Bool LogicOp Bool -- Logical operations
+  -- TODO: change the line below so that it takes in Expressions (Comparables?)
+  -- and not Bools
+  | OpL Bool LogicOp Bool
   | OpN NullOp ColName -- isna() / notna() in Pandas
   deriving (Eq, Show)
 

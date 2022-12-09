@@ -332,7 +332,9 @@ data Condition
   | Limit Int
   deriving (Eq, Show)
 
--- QUESTION FOR JOE: how to make inferCondition more elegant??
+-- TODO: In the function inferCondition, use alternative instead of nested cases
+-- (change return type of ParseGroupByExp, parseOrderByExp etc. to
+-- Parser a instead of using Either monad)
 
 -- | Infers whether a query condition is a WHERE, a GROUP BY,
 -- an ORDER BY or a LIMIT
