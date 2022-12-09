@@ -56,6 +56,10 @@ data JoinExp = Join
   }
   deriving (Eq, Show)
 
+-- Datatype representing any table/colname
+data Name = T TableName | C ColName
+  deriving (Eq, Show)
+
 -- Limit the no. of rows in output
 newtype LimitExp = Limit Int
 

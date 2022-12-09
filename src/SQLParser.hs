@@ -147,10 +147,6 @@ selectExpP str =
                   "distinct" -> Right $ DistinctCols (selectExpHelper tl)
                   _ -> Right $ Cols (selectExpHelper cols)
 
--- Recursive helper for iterating over list of colnames
-selectExpHelper :: [String] -> [ColExp]
-selectExpHelper strs = rights (map parseSelectAttr strs)
-
 -- Split a string on multiple delimiters
 -- (Use foldl' to force the accumulator argument to be evaluated immediately)
 splitOnDelims :: [String] -> String -> [String]
@@ -158,6 +154,10 @@ splitOnDelims delims str =
   filter
     (not . null)
     (foldl' (\xs delim -> concatMap (splitOn delim) xs) [str] delims)
+
+-- Recursive helper for iterating over list of colnames
+selectExpHelper :: [String] -> [ColExp]
+selectExpHelper strs = rights (map parseSelectAttr strs)
 
 -- Parses a single string as a ColExp
 -- (If there's a function call,
@@ -194,15 +194,36 @@ fromExpP str = case P.doParse fromTokenP str of
      in case tables of
           [] -> Left "No table selected in FROM expression"
           [tableName] -> Right $ Table tableName Nothing
-          hd : tl -> undefined "TODO"
+          leftT : joinTok : rightT : onTok : leftTabCol : eqTok : rightTabCol : tl -> undefined
+          _ -> undefined
 
 -- TODO: update type to be Parser JoinExp
 -- This currently parses the thing "a join b on"
 -- Need to make this also parse the string "a.col = b.col"
 joinExpP :: Parser String
-joinExpP = nameP <* joinTokenP *> nameP <* onTokenP *> nameP
+joinExpP = nameP <* joinTokenP *> nameP <* onTokenP
 
--- >>> P.doParse joinExpP "a join b on a.col"
+leftTableP :: Parser TableName
+leftTableP = nameP <* joinTokenP
+
+-- Parses
+tableColP :: Parser String
+tableColP = nameP <* stringP "."
+
+resolveTableCol :: String -> Maybe (TableName, ColName)
+resolveTableCol str = do
+  (table, col) <- P.doParse tableColP str
+  return (table, col)
+
+parseJoinAttr :: String -> JoinExp
+parseJoinAttr str = do
+  -- (leftT, remainderStr) <- P.doParse leftTableP str
+  undefined
+
+-- >>> P.doParse tableColP "a.col"
+-- Just ("a","col")
+
+-- >>> P.doParse joinExpP "a join b on"
 -- Just ("a",".col")
 
 -- >>> P.doParse fromTokenP "from a join b on a.col = b.col"
@@ -218,6 +239,25 @@ tables = ["a", "join", "b", "on", "a.col", "=", "b.col"]
 
 whereTokenP :: Parser ()
 whereTokenP = stringP "where"
+
+compOpP :: Parser CompOp
+compOpP = constP "=" Eq <|> constP ">" Gt <|> constP ">=" Ge <|> constP "<" Lt <|> constP "<=" Le
+
+arithOpP :: Parser ArithOp
+arithOpP = wsP $ constP "+" Plus <|> constP "-" Minus <|> constP "*" Times <|> constP "//" Divide <|> constP "%" Modulo
+
+logicOpP :: Parser LogicOp
+logicOpP = constP "and" And <|> constP "or" Or
+
+-- Parses Where expressions
+whereExpP :: String -> Either P.ParseError BoolExp
+whereExpP str = case P.doParse whereTokenP str of
+  Nothing -> Left "No parses"
+  Just ((), remainderStr) ->
+    let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
+     in case cols of
+          [] -> Left "No columns selected to Group By"
+          hd : tl -> undefined
 
 groupByTokenP :: Parser ()
 groupByTokenP = stringP "group by"
@@ -281,10 +321,6 @@ joinStyleP = undefined
 comparableP :: Parser Comparable
 comparableP = undefined
 
--- Parses Where expressions
-whereExpP :: Parser BoolExp
-whereExpP = undefined
-
 -- Parsers for various operations
 renameOpP :: Parser RenameOp
 renameOpP = undefined
@@ -294,15 +330,6 @@ aggFuncOp = undefined
 
 nullOpP :: Parser NullOp
 nullOpP = undefined
-
-compOpP :: Parser CompOp
-compOpP = undefined
-
-arithOpP :: Parser ArithOp
-arithOpP = undefined
-
-logicOpP :: Parser LogicOp
-logicOpP = undefined
 
 -- Wrapper function for all the query business logic
 
