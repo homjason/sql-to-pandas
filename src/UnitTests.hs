@@ -11,6 +11,7 @@ import Types.SQLTypes as SQL
 import Types.TableTypes
 import Types.Types
 
+{- Parser Tests -}
 -- SELECT Expression Tests
 test_selectTokenP :: Test
 test_selectTokenP =
@@ -48,48 +49,104 @@ test_parseSelectExp =
 -- Counts {cases = 5, tried = 5, errors = 0, failures = 1}
 
 -- GROUP BY Expression Tests
-test_groupByP :: Test
-test_groupByP =
+test_parseGroupByExp :: Test
+test_parseGroupByExp =
   "parsing GROUP BY expressions"
     ~: TestList
-      [ groupByP "group by col1" ~?= Right ["col1"],
-        groupByP "group by col1, col2" ~?= Right ["col1", "col2"],
-        groupByP "group by" ~?= Left "No columns selected to Group By",
-        groupByP "hello world" ~?= Left "No parses"
+      [ parseGroupByExp "group by col1" ~?= Right ["col1"],
+        parseGroupByExp "group by col1, col2" ~?= Right ["col1", "col2"],
+        parseGroupByExp "group by" ~?= Left "No columns selected to Group By",
+        parseGroupByExp "hello world" ~?= Left "No parses"
       ]
 
-test_orderByP :: Test
-test_orderByP =
+test_parseOrderByExp :: Test
+test_parseOrderByExp =
   "parsing ORDER BY clauses"
     ~: TestList
-      [ orderByP "arbitrary_string" ~?= Left "no parses",
-        orderByP "order by" ~?= Left "Error: incomplete Order By expression",
-        orderByP "order by col0" ~?= Right ("col0", Asc),
-        orderByP "order by col2 asc" ~?= Right ("col2", Asc),
-        orderByP "order by col1 desc" ~?= Right ("col1", Desc),
-        orderByP "order by col1 wrongOrder" ~?= Left "Error: invalid sort order",
-        orderByP "order by nonexistentCol wrongOrder" ~?= Left "Error: invalid sort order",
-        orderByP "order by col1, col2 asc" ~?= Left "Error: too many tokens in Order By expression",
-        orderByP "order by col1, col2, col3 desc" ~?= Left "Error: too many tokens in Order By expression"
+      [ parseOrderByExp "arbitrary_string" ~?= Left "no parses",
+        parseOrderByExp "order by" ~?= Left "Error: incomplete Order By expression",
+        parseOrderByExp "order by col0" ~?= Right ("col0", Asc),
+        parseOrderByExp "order by col2 asc" ~?= Right ("col2", Asc),
+        parseOrderByExp "order by col1 desc" ~?= Right ("col1", Desc),
+        parseOrderByExp "order by col1 wrongOrder" ~?= Left "Error: invalid sort order",
+        parseOrderByExp "order by nonexistentCol wrongOrder" ~?= Left "Error: invalid sort order",
+        parseOrderByExp "order by col1, col2 asc" ~?= Left "Error: too many tokens in Order By expression",
+        parseOrderByExp "order by col1, col2, col3 desc" ~?= Left "Error: too many tokens in Order By expression"
       ]
-
--- >>> runTestTT test_orderByP
 
 test_parseQuerySimple :: Test
 test_parseQuerySimple =
   "simple SQL SELECT & FROM queries"
     ~: TestList
-      [ P.parse parseQuery "SELECT col FROM table"
+      [ parseQuery "SELECT col\nFROM table"
           ~?= Right
             Query
               { select = Cols [Col "col"],
                 from = Table "table" Nothing,
                 wher = Nothing,
                 groupBy = Nothing,
-                limit = Nothing,
-                orderBy = Nothing
+                orderBy = Nothing,
+                limit = Nothing
               }
       ]
+
+test_parseQuery :: Test
+test_parseQuery =
+  "parsing SQL Queries"
+    ~: TestList
+      [ parseQuery "SELECT col1\nFROM table\nLIMIT 5"
+          ~?= Right
+            Query
+              { select = Cols [Col "col"],
+                from = Table "table" Nothing,
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Just 5
+              },
+        parseQuery "SELECT col1, COUNT(col2)\nFROM table\nGROUP BY col1"
+          ~?= Right
+            Query
+              { select = Cols [Col "col1", Agg Count "col2"],
+                from = Table "table" Nothing,
+                wher = Nothing,
+                groupBy = Just ["col1"],
+                orderBy = Nothing,
+                limit = Nothing
+              },
+        parseQuery "SELECT col1, COUNT(col2)\n     FROM table   \n      GROUP BY col1"
+          ~?= Right
+            Query
+              { select = Cols [Col "col1", Agg Count "col2"],
+                from = Table "table" Nothing,
+                wher = Nothing,
+                groupBy = Just ["col1"],
+                orderBy = Nothing,
+                limit = Nothing
+              },
+        parseQuery "SELECT col\nFROM table\nORDER BY col"
+          ~?= Right
+            Query
+              { select = Cols [Col "col"],
+                from = Table "table" Nothing,
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Just ("col", Asc),
+                limit = Nothing
+              },
+        parseQuery "SELECT col, col2\nFROM table\nWHERE col > 4"
+          ~?= Right
+            Query
+              { select = Cols [Col "col", Col "col2"],
+                from = Table "table" Nothing,
+                wher = Just $ OpC (ColName "col") Gt (LitInt 4),
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              }
+      ]
+
+-- >>> runTestTT test_parseQuery
 
 -- >>> runTestTT test_parseFromExp
 -- Counts {cases = 3, tried = 3, errors = 0, failures = 2}
@@ -183,7 +240,7 @@ test_doubleValP =
         P.parse doubleValP "-3.00" ~?= Right (DoubleVal (-3.0 :: Double))
       ]
 
--- TRANSLATOR unit tests
+{- TRANSLATOR unit tests -}
 
 selectStarQ :: Query
 selectStarQ =

@@ -15,10 +15,10 @@ import Types.Types
 data Query = Query
   { select :: SelectExp,
     from :: FromExp,
-    wher :: Maybe [BoolExp],
+    wher :: Maybe BoolExp,
     groupBy :: Maybe [ColName],
-    limit :: Maybe Int,
-    orderBy :: Maybe (ColName, Order)
+    orderBy :: Maybe (ColName, Order),
+    limit :: Maybe Int
   }
   deriving (Eq, Show)
 
@@ -59,9 +59,6 @@ data JoinExp = Join
 -- Datatype representing any table/colname
 data Name = T TableName | C ColName
   deriving (Eq, Show)
-
--- Limit the no. of rows in output
-newtype LimitExp = Limit Int
 
 -- TODO: come back to this
 -- QUESTION FOR JOE: Do we need to use the state monad to map table aliases to the acutal table datatype?

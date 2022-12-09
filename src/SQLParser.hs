@@ -112,8 +112,8 @@ stringValP = StringVal <$> P.between (P.char '\"') (many $ P.satisfy (/= '\"')) 
 -- Parses the token "IS NULL"
 -- QUESTION FOR JOE: Should we change the type?
 -- IsNull :: ColName -> NullOp
--- isNullTokenP :: Parser (ColName -> NullOp)
--- isNullTokenP = constP "is null" IsNull
+-- isNullTokenP :: Parser NullOp
+-- isNullTokenP = constP "is null" IsNull <* nameP
 
 -- Parses the token "IS NOT NULL"
 -- isNotNullTokenP :: Parser (ColName -> NullOp)
@@ -151,7 +151,7 @@ parseSelectExp str =
         _ ->
           let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
            in case cols of
-                [] -> Left "No columns selected to Query"
+                [] -> Left "No columns selected in Query"
                 hd : tl -> case hd of
                   "distinct" -> Right $ DistinctCols (selectExpHelper tl)
                   _ -> Right $ Cols (selectExpHelper cols)
@@ -257,8 +257,8 @@ logicOpP :: Parser LogicOp
 logicOpP = constP "and" And <|> constP "or" Or
 
 -- Parses Where expressions
-whereExpP :: String -> Either P.ParseError BoolExp
-whereExpP str = case P.doParse whereTokenP str of
+parseWhereExp :: String -> Either P.ParseError BoolExp
+parseWhereExp str = case P.doParse whereTokenP str of
   Nothing -> Left "No parses"
   Just ((), remainderStr) ->
     let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
@@ -270,8 +270,8 @@ groupByTokenP :: Parser ()
 groupByTokenP = stringP "group by"
 
 -- Parse GROUP BY expressions
-groupByP :: String -> Either P.ParseError [ColName]
-groupByP str = case P.doParse groupByTokenP str of
+parseGroupByExp :: String -> Either P.ParseError [ColName]
+parseGroupByExp str = case P.doParse groupByTokenP str of
   Nothing -> Left "No parses"
   Just ((), remainderStr) ->
     let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
@@ -284,20 +284,20 @@ orderByTokenP = stringP "order by"
 
 -- Parse ORDER BY expressions
 -- Note: we specify that we can only sort by one column
-orderByP :: String -> Either P.ParseError (ColName, Order)
-orderByP str =
+parseOrderByExp :: String -> Either P.ParseError (ColName, Order)
+parseOrderByExp str =
   case P.doParse orderByTokenP str of
     Nothing -> Left "no parses"
     Just ((), remainder) ->
       let orderByExp = map stripSpace (splitOnDelims [",", " "] remainder)
        in case orderByExp of
-            [] -> Left "Error: incomplete Order By expression"
+            [] -> Left "Incomplete Order By expression"
             [col] -> Right (col, Asc)
             [col, order] ->
               case stringToOrder order of
                 Just ord -> Right (col, ord)
                 Nothing -> Left "Error: invalid sort order"
-            _ -> Left "Error: too many tokens in Order By expression"
+            _ -> Left "Too many tokens in Order By expression"
 
 -- Helper function: converts a string representing a sort order to an Order
 stringToOrder :: String -> Maybe Order
@@ -305,28 +305,13 @@ stringToOrder "asc" = Just Asc
 stringToOrder "desc" = Just Desc
 stringToOrder _ = Nothing
 
--- QUESTION FOR JOE: Is the type of the limitP parser bad (since it parses a function?)
+-- Parser for limit expressions (consumes subsequent whitespace)
+limitP :: Parser Int
+limitP = stringP "limit" *> P.int
+
 -- Parses the "Limit" token & the subsequent integer
-limitP :: Parser (Int -> LimitExp)
-limitP = constP "limit" Limit
-
--- Initial query prior to parsing
--- initialQuery :: Query
--- initialQuery =
---   Query
---     { select = EmptySelect,
---       from = EmptyFrom,
---       wher = Nothing,
---       groupBy = Nothing,
---       limit = Nothing,
---       orderBy = Nothing
---     }
-
-joinStyleP :: Parser JoinStyle
-joinStyleP = undefined
-
-comparableP :: Parser Comparable
-comparableP = undefined
+parseLimitExp :: String -> Either P.ParseError Int
+parseLimitExp = P.parse limitP
 
 -- Parsers for various operations
 renameOpP :: Parser RenameOp
@@ -336,33 +321,128 @@ aggFuncOp :: Parser AggFunc
 aggFuncOp = undefined
 
 nullOpP :: Parser NullOp
-nullOpP = undefined
+nullOpP = undefined "TODO"
 
--- Wrapper function for all the query business logic
+-- Datatype that encapsulates various SQL query conditions
+-- (WHERE / GROUP BY / ORDER BY / LIMIT)
+data Condition
+  = Wher BoolExp
+  | GroupBy [ColName]
+  | OrderBy (ColName, Order)
+  | Limit Int
+  deriving (Eq, Show)
 
-parseQuery :: Parser Query
-parseQuery = undefined "wsP $ selectExpP <|> fromExpP"
+-- QUESTION FOR JOE: how to make inferCondition more elegant??
 
--- Converts query string to lower case & splits on new lines
+-- | Infers whether a query condition is a WHERE, a GROUP BY,
+-- an ORDER BY or a LIMIT
+inferCondition :: String -> Either P.ParseError Condition
+inferCondition str =
+  case parseWhereExp str of
+    Right whereExp -> Right $ Wher whereExp
+    Left e1 ->
+      case parseGroupByExp str of
+        Right groupByCols -> Right $ GroupBy groupByCols
+        Left e2 ->
+          case parseOrderByExp str of
+            Right orderByExp -> Right $ OrderBy orderByExp
+            Left e3 ->
+              case parseLimitExp str of
+                Right numRows -> Right $ Limit numRows
+                Left e4 -> Left "Malformed SQL query"
+
+-- | Construct a Query based on a SelectExp, FromExp & some condition
+mkQuery :: SelectExp -> FromExp -> Condition -> Query
+mkQuery s f condition =
+  case condition of
+    Wher w -> Query s f (Just w) Nothing Nothing Nothing
+    GroupBy g -> Query s f Nothing (Just g) Nothing Nothing
+    OrderBy o -> Query s f Nothing Nothing (Just o) Nothing
+    Limit l -> Query s f Nothing Nothing Nothing (Just l)
+
+-- | Construct a Query based on a SelectExp, FromExp & two conditions
+-- Returns a ParseError if the two conditions are invalid / in the wrong order
+mkQuery2 :: SelectExp -> FromExp -> Condition -> Condition -> Either P.ParseError Query
+mkQuery2 s f c1 c2 =
+  case (c1, c2) of
+    (Wher w, GroupBy g) -> Right $ Query s f (Just w) (Just g) Nothing Nothing
+    (Wher w, OrderBy o) -> Right $ Query s f (Just w) Nothing (Just o) Nothing
+    (Wher w, Limit l) -> Right $ Query s f (Just w) Nothing Nothing (Just l)
+    (GroupBy g, OrderBy o) -> Right $ Query s f Nothing (Just g) (Just o) Nothing
+    (GroupBy g, Limit l) -> Right $ Query s f Nothing (Just g) Nothing (Just l)
+    (OrderBy o, Limit l) -> Right $ Query s f Nothing Nothing (Just o) (Just l)
+    (_, _) -> Left "Malformed SQL query, couldn't infer query conditions"
+
+-- | Construct a Query based on a SelectExp, FromExp & three conditions
+-- Returns a ParseError if the two conditions are invalid / in the wrong order
+mkQuery3 :: SelectExp -> FromExp -> Condition -> Condition -> Condition -> Either P.ParseError Query
+mkQuery3 s f c1 c2 c3 =
+  case (c1, c2, c3) of
+    (Wher w, GroupBy g, OrderBy o) -> Right $ Query s f (Just w) (Just g) (Just o) Nothing
+    (Wher w, OrderBy o, Limit l) -> Right $ Query s f (Just w) Nothing (Just o) (Just l)
+    (GroupBy g, OrderBy o, Limit l) -> Right $ Query s f Nothing (Just g) (Just o) (Just l)
+    (_, _, _) -> Left "Malformed SQL query, couldn't infer query conditions"
+
+-- | Wrapper function for all the query-parsing business logic
+-- s = SELECT expression
+-- f = FROM expression
+-- w = WHERE expression
+-- g = GROUP BY expression
+-- o = ORDER BY expression
+-- l = LIMIT expression
+-- c = Arbitrary SQL query condition (WHERE/GROUP BY/ORDER BY/LIMIT)
+parseQuery :: String -> Either P.ParseError Query
+parseQuery str =
+  case splitQueryString str of
+    [] -> Left "No parses"
+    [select, from] -> do
+      s <- parseSelectExp select
+      f <- parseFromExp from
+      Right $ Query s f Nothing Nothing Nothing Nothing
+    [select, from, c] -> do
+      s <- parseSelectExp select
+      f <- parseFromExp from
+      case inferCondition c of
+        Left errorMsg -> Left errorMsg
+        Right c' -> Right $ mkQuery s f c'
+    [select, from, c1, c2] -> do
+      s <- parseSelectExp select
+      f <- parseFromExp from
+      case (inferCondition c1, inferCondition c2) of
+        (Right w@(Wher _), Right g@(GroupBy _)) -> mkQuery2 s f w g
+        (Right w@(Wher _), Right o@(OrderBy _)) -> mkQuery2 s f w o
+        (Right w@(Wher _), Right l@(Limit _)) -> mkQuery2 s f w l
+        (Right g@(GroupBy _), Right o@(OrderBy _)) -> mkQuery2 s f g o
+        (Right g@(GroupBy _), Right l@(Limit _)) -> mkQuery2 s f g l
+        (Right o@(OrderBy _), Right l@(Limit _)) -> mkQuery2 s f o l
+        (_, _) -> Left "Malformed SQL query"
+    [select, from, c1, c2, c3] -> do
+      s <- parseSelectExp select
+      f <- parseFromExp from
+      case (inferCondition c1, inferCondition c2, inferCondition c3) of
+        (Right w@(Wher _), Right g@(GroupBy _), Right o@(OrderBy _)) -> mkQuery3 s f w g o
+        (Right w@(Wher _), Right o@(OrderBy _), Right l@(Limit _)) -> mkQuery3 s f w o l
+        (Right g@(GroupBy _), Right o@(OrderBy _), Right l@(Limit _)) -> mkQuery3 s f g o l
+        (_, _, _) -> Left "Malformed SQL query"
+    [select, from, wher, groupBy, orderBy, limit] -> do
+      s <- parseSelectExp select
+      f <- parseFromExp from
+      w <- parseWhereExp wher
+      g <- parseGroupByExp groupBy
+      o <- parseOrderByExp orderBy
+      l <- parseLimitExp limit
+      Right $ Query s f (Just w) (Just g) (Just o) (Just l)
+    _ -> Left "Invalid SQL Query"
+
+-- Converts query string to lower case, splits on newlines
+-- & strips leading/trailing whitespace
+-- NB: each clause in a SQL query (SELECT, FROM, etc.) must be on a new line
 splitQueryString :: String -> [String]
-splitQueryString str = lines (map toLower str)
-
--- >>> splitQueryString "SELECT DISTINCT col"
+splitQueryString = map stripSpace . lines . map toLower
 
 -- Parses a SQL file (takes in filename of the SQL file)
 -- Returns either a ParseError (Left) or a Query (Right)
-parseSqlFile :: String -> IO (Either P.ParseError Query)
-parseSqlFile = P.parseFromFile (const <$> parseQuery <*> P.eof)
+-- parseSqlFile :: String -> IO (Either P.ParseError Query)
+-- parseSqlFile = P.parseFromFile (const <$> parseQuery <*> P.eof)
 
 -- nullOpP = wsP $ P.string "IS NULL" *> pure isNull
-
-{-
-select = Nothing
-From = NOthing
-Where = Nothing
-
-WE parse the string --> where we find select = val, from = val, where = val
-
-return Query {select = select, from = from, where=from}
-
--}

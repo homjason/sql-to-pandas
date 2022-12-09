@@ -33,7 +33,9 @@ initialCommand =
 
 -- Converts "FROM" expressions in SQL to the table name
 fromExpToTable :: FromExp -> TableName
-fromExpToTable = undefined
+fromExpToTable fromExp = case fromExp of
+  Table name mJoin -> name
+  SubQuery query mJoin -> undefined
 
 -- Converts "JOIN ON" expressions in SQL to "merge" function in Pandas
 joinExpToMerge :: JoinExp -> MergeExp
@@ -49,7 +51,7 @@ whereExpToLoc :: BoolExp -> Func
 whereExpToLoc = undefined
 
 -- Converts "LIMIT" clauses in SQL to "head" function in Pandas
-limitExpToHead :: LimitExp -> Func
+limitExpToHead :: Int -> Func
 limitExpToHead = undefined
 
 -- Converts "ORDER BY" clauses in SQL to "sort" function in Pandas
