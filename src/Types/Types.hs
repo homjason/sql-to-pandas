@@ -15,17 +15,14 @@ type ColName = String
 data Order = Asc | Desc
   deriving (Show, Eq, Enum, Bounded)
 
--- Datatype for filtering on rows in Pandas (akin to WHERE clauses in SQL)
-data BoolExp
-  = OpC Comparable CompOp Comparable -- Comparison operations
-  | OpA Comparable ArithOp Comparable -- Arithmetic Operations
-  -- TODO: change the line below so that it takes in Expressions (Comparables?)
-  -- and not Bools
-  | OpL BoolExp LogicOp BoolExp
-  | OpN NullOp ColName -- isna() / notna() in Pandas
+-- Datatype for filtering rows (WHERE clauses in SQL)
+data WhereExp
+  = Op1 Uop WhereExp
+  | Op2 WhereExp Bop WhereExp
+  | CompVal Comparable
   deriving (Eq, Show)
 
--- Values that can be compared in SQL queries
+-- Values that can be compared in SQL queries (either columns or literal values)
 data Comparable
   = ColName ColName -- column name
   | LitInt Int -- literal ints
@@ -33,21 +30,26 @@ data Comparable
   | LitDouble Double -- literal doubles
   deriving (Eq, Show)
 
--- Datatype representing unary/binary operators
-data Bop = CompOp CompOp | ArithOp ArithOp | LogicOp LogicOp
+-- Datatype representing binary operators
+data Bop = Comp CompOp | Arith ArithOp | Logic LogicOp
   deriving (Eq, Show)
 
--- Binary operator precedence
--- (similar to Haskell's operator precedence)
+-- Unary operators
+data Uop = IsNull | IsNotNull
+  deriving (Eq, Show, Bounded, Enum)
+
+-- Binary operator precedence (similar to Haskell's operator precedence)
+-- https://rosettacode.org/wiki/Operator_precedence
+-- Higher number means that the operator binds more tightly to the operands
 level :: Bop -> Int
-level (LogicOp Or) = 2
-level (LogicOp And) = 3
-level (CompOp _) = 4
-level (ArithOp Plus) = 6
-level (ArithOp Minus) = 6
-level (ArithOp Times) = 7
-level (ArithOp Divide) = 7
-level (ArithOp Modulo) = 7
+level (Logic Or) = 3
+level (Logic And) = 3
+level (Comp _) = 4
+level (Arith Plus) = 6
+level (Arith Minus) = 6
+level (Arith Times) = 7
+level (Arith Divide) = 7
+level (Arith Modulo) = 7
 
 -- Comparison (binary) operations that return a Boolean
 data CompOp
@@ -75,10 +77,10 @@ data LogicOp
 
 -- Unary operations for checking if a column is null / not-null
 -- akin to isna() & notna() in Pandas
-data NullOp
-  = IsNull -- Check whether a column contains null values
-  | IsNotNull -- Check whether a column contains non-null values
-  deriving (Eq, Show, Enum, Bounded)
+-- data NullOp
+--  = IsNull -- Check whether a column contains null values
+--  | IsNotNull -- Check whether a column contains non-null values
+--  deriving (Eq, Show, Enum, Bounded)
 
 -- Aggregate Functions to be used with a GroupBy
 data AggFunc

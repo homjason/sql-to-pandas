@@ -91,33 +91,31 @@ reserved =
   ]
 
 -- Parses literal values (ints, booleans, strings, doubles)
-valueP :: Parser Value
-valueP = intValP <|> boolValP <|> stringValP <|> doubleValP
+-- valueP :: Parser Value
+-- valueP = intValP <|> boolValP <|> stringValP <|> doubleValP
 
--- Parses positive / negative integers
-intValP :: Parser Value
-intValP = IntVal <$> wsP P.int
+-- Parses positive / negative integer literals
+litIntP :: Parser Comparable
+litIntP = LitInt <$> wsP P.int
 
 boolValP :: Parser Value
 boolValP = BoolVal <$> (constP "true" True <|> constP "false" False)
 
--- TODO: fix this!
-doubleValP :: Parser Value
-doubleValP = undefined -- "intValP <* stringP "." *> intValP"
+strToDouble :: String -> Double
+strToDouble = read :: String -> Double
 
--- Between quote characters, we have non-quote characters
-stringValP :: Parser Value
-stringValP = StringVal <$> P.between (P.char '\"') (many $ P.satisfy (/= '\"')) (stringP "\"")
+numberP :: Parser String
+numberP = P.choice [some P.digit, P.char '+' *> some P.digit, (:) <$> P.char '-' <*> some P.digit]
 
--- Parses the token "IS NULL"
--- QUESTION FOR JOE: Should we change the type?
--- IsNull :: ColName -> NullOp
--- isNullTokenP :: Parser NullOp
--- isNullTokenP = constP "is null" IsNull <* nameP
+-- doubleValP :: Parser Comparable
+-- doubleValP = LitDouble <$>
+-- strToDouble <$> (++) <$> some P.digit <*> (optionP "" $ (:) <$> P.char '.' <*> some P.digit)
 
--- Parses the token "IS NOT NULL"
--- isNotNullTokenP :: Parser (ColName -> NullOp)
--- isNotNullTokenP = constP "is not null" IsNotNull
+-- optionP :: String -> Parser String -> Parser String
+-- optionP default p = p <|> return default
+
+number :: Parser String
+number = some P.digit
 
 -- | Parses the SELECT token
 selectTokenP :: Parser ()
@@ -257,14 +255,81 @@ logicOpP :: Parser LogicOp
 logicOpP = constP "and" And <|> constP "or" Or
 
 -- Parses Where expressions
-parseWhereExp :: String -> Either P.ParseError BoolExp
+parseWhereExp :: String -> Either P.ParseError WhereExp
 parseWhereExp str = case P.doParse whereTokenP str of
   Nothing -> Left "No parses"
-  Just ((), remainderStr) ->
-    let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
-     in case cols of
-          [] -> Left "No columns selected in Group By"
-          hd : tl -> undefined
+  Just ((), remainder) -> P.parse whereExpP remainder
+
+-- | Parse WHERE expressions (binary/unary operators are left associative)
+-- (modified from HW5)
+-- We first parse AND/OR oeprators, then comparison operators,
+-- then +/-, then * & /, then unary operators)
+
+-- QUESTION FOR JOE: we need to enclose each literal int in parentheses in order
+-- for this function to work, not sure how to fix this
+whereExpP :: Parser WhereExp
+whereExpP = compP
+  where
+    logicP = compP `P.chainl1` opAtLevel (level (Logic And))
+    compP = sumP `P.chainl1` opAtLevel (level (Comp Gt))
+    sumP = prodP `P.chainl1` opAtLevel (level (Arith Plus))
+    prodP = uopexpP `P.chainl1` opAtLevel (level (Arith Times))
+    uopexpP =
+      baseP
+        <|> Op1 <$> uopP <*> uopexpP
+    baseP =
+      CompVal <$> comparableP
+        <|> parens whereExpP
+
+-- >>> parseWhereExp "where 1 + 2"
+-- Right (CompVal (LitInt 1))
+
+-- >>> parseWhereExp "where (1) + (2)"
+-- Right (Op2 (CompVal (LitInt 1)) (Arith Plus) (CompVal (LitInt 2)))
+
+-- >>> parseWhereExp "where col = \"hello\""
+-- Right (Op2 (CompVal (ColName "col")) (Comp Eq) (CompVal (LitString "hello")))
+
+-- Parses string literals
+-- (non-quote characters enclosed in-between escaped double quotes)
+litStringP :: Parser String
+litStringP = P.between (P.char '\"') (many $ P.satisfy (/= '\"')) (stringP "\"")
+
+-- | Parser for Comparable values
+-- TODO: handle LitDouble
+comparableP :: Parser Comparable
+comparableP =
+  P.choice
+    [ ColName <$> nameP,
+      LitInt <$> P.int,
+      LitString <$> litStringP
+    ]
+
+-- | Parse an operator at a specified precedence level (from HW5)
+opAtLevel :: Int -> Parser (WhereExp -> WhereExp -> WhereExp)
+opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
+
+-- | Parses binary operators
+bopP :: Parser Bop
+bopP =
+  P.choice
+    [ constP "=" (Comp Eq),
+      constP ">" (Comp Gt),
+      constP ">=" (Comp Ge),
+      constP "<" (Comp Lt),
+      constP "<=" (Comp Le),
+      constP "+" (Arith Plus),
+      constP "-" (Arith Minus),
+      constP "*" (Arith Times),
+      constP "/" (Arith Divide),
+      constP "%" (Arith Modulo),
+      constP "and" (Logic And),
+      constP "or" (Logic Or)
+    ]
+
+-- | Parses unary operators
+uopP :: Parser Uop
+uopP = P.choice [constP "is null" IsNull, constP "is not null" IsNotNull]
 
 groupByTokenP :: Parser ()
 groupByTokenP = stringP "group by"
@@ -276,7 +341,7 @@ parseGroupByExp str = case P.doParse groupByTokenP str of
   Just ((), remainderStr) ->
     let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
      in case cols of
-          [] -> Left "No columns selected to Group By"
+          [] -> Left "No columns selected in Group By"
           hd : tl -> Right cols
 
 orderByTokenP :: Parser ()
@@ -320,13 +385,13 @@ renameOpP = undefined
 aggFuncOp :: Parser AggFunc
 aggFuncOp = undefined
 
-nullOpP :: Parser NullOp
-nullOpP = undefined "TODO"
+-- nullOpP :: Parser NullOp
+-- nullOpP = undefined "TODO"
 
 -- Datatype that encapsulates various SQL query conditions
 -- (WHERE / GROUP BY / ORDER BY / LIMIT)
 data Condition
-  = Wher BoolExp
+  = Wher WhereExp
   | GroupBy [ColName]
   | OrderBy (ColName, Order)
   | Limit Int

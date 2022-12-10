@@ -21,6 +21,15 @@ test_selectTokenP =
         P.parse selectTokenP "from tableA" ~?= Left "No parses"
       ]
 
+test_comparableP :: Test
+test_comparableP =
+  "parsing Comparable values"
+    ~: TestList
+      [ P.parse comparableP "col" ~?= Right (ColName "col"),
+        P.parse comparableP "52" ~?= Right (LitInt 52),
+        P.parse comparableP "\"string literal\"" ~?= Right (LitString "string literal")
+      ]
+
 test_splitOnDelims :: Test
 test_splitOnDelims =
   "split on comma and spaces"
@@ -139,7 +148,7 @@ test_parseQuery =
             Query
               { select = Cols [Col "col", Col "col2"],
                 from = Table "table" Nothing,
-                wher = Just $ OpC (ColName "col") Gt (LitInt 4),
+                wher = Just $ Op2 (CompVal $ ColName "col") (Comp Gt) (CompVal $ LitInt 4),
                 groupBy = Nothing,
                 orderBy = Nothing,
                 limit = Nothing
@@ -229,16 +238,16 @@ test_parseJoinExp =
           ~?= Left "No parses"
       ]
 
-test_doubleValP :: Test
-test_doubleValP =
-  "parsing literal doubles"
-    ~: TestList
-      [ P.parse doubleValP "5.52" ~?= Right (DoubleVal (5.52 :: Double)),
-        P.parse doubleValP "-2.25" ~?= Right (DoubleVal (2.25 :: Double)),
-        P.parse doubleValP "0.00" ~?= Right (DoubleVal (0.0 :: Double)),
-        P.parse doubleValP "1.00" ~?= Right (DoubleVal (1.0 :: Double)),
-        P.parse doubleValP "-3.00" ~?= Right (DoubleVal (-3.0 :: Double))
-      ]
+-- test_doubleValP :: Test
+-- test_doubleValP =
+--   "parsing literal doubles"
+--     ~: TestList
+--       [ P.parse doubleValP "5.52" ~?= Right (DoubleVal (5.52 :: Double)),
+--         P.parse doubleValP "-2.25" ~?= Right (DoubleVal (2.25 :: Double)),
+--         P.parse doubleValP "0.00" ~?= Right (DoubleVal (0.0 :: Double)),
+--         P.parse doubleValP "1.00" ~?= Right (DoubleVal (1.0 :: Double)),
+--         P.parse doubleValP "-3.00" ~?= Right (DoubleVal (-3.0 :: Double))
+--       ]
 
 {- TRANSLATOR unit tests -}
 

@@ -15,7 +15,7 @@ import Types.Types
 data Query = Query
   { select :: SelectExp,
     from :: FromExp,
-    wher :: Maybe BoolExp,
+    wher :: Maybe WhereExp,
     groupBy :: Maybe [ColName],
     orderBy :: Maybe (ColName, Order),
     limit :: Maybe Int

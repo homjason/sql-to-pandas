@@ -23,7 +23,7 @@ Things we (might) need types for:
 data Command = Command
   { df :: TableName,
     cols :: Maybe [ColName],
-    fn :: Maybe Func
+    fn :: Maybe [Func]
   }
   deriving (Eq, Show)
 
@@ -42,12 +42,11 @@ instance Monoid Block where
 -- For AggFunc, the 1st ColName arg is the column we're aggregating over
 -- and the 2nd ColName arg is the new (alias) name for the aggregated column
 data Func
-  = DropDuplicates (Maybe [ColName])
-  | SortValues ColName Order
+  = SortValues ColName Order
   | Rename (Map ColName ColName)
   | GroupBy [ColName]
   | Aggregate AggFunc ColName ColName
-  | Loc BoolExp -- filtering on rows (akin to WHERE in SQL)
+  | Loc WhereExp -- filtering on rows (akin to WHERE in SQL)
   | Merge MergeExp
   | Unique [ColName]
   | Head Int -- limit no. of rows in output
