@@ -16,8 +16,10 @@ data Order = Asc | Desc
   deriving (Show, Eq, Enum, Bounded)
 
 -- Datatype for filtering rows (WHERE clauses in SQL)
+-- The only unary operators supported are "IS NULL" / "IS NOT NULL",
+-- which are applied postfix in SQL
 data WhereExp
-  = Op1 Uop WhereExp
+  = Op1 WhereExp Uop
   | Op2 WhereExp Bop WhereExp
   | CompVal Comparable
   deriving (Eq, Show)
@@ -25,7 +27,7 @@ data WhereExp
 -- Values that can be compared in SQL queries (either columns or literal values)
 data Comparable
   = ColName ColName -- column name
-  | LitInt Int -- literal ints
+  | LitInt Int -- literal ints (positive / negative)
   | LitString String -- literal strings
   | LitDouble Double -- literal doubles
   deriving (Eq, Show)

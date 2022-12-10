@@ -57,6 +57,21 @@ test_parseSelectExp =
 -- >>> runTestTT test_parseSelectExp
 -- Counts {cases = 5, tried = 5, errors = 0, failures = 1}
 
+-- TODO: fix failing test cases
+test_parseWhereExp :: Test
+test_parseWhereExp =
+  "parsing WHERE expressions"
+    ~: TestList
+      [ parseWhereExp "where 1 + 2"
+          ~?= Right (Op2 (CompVal (LitInt 1)) (Arith Plus) (CompVal (LitInt 2))),
+        parseWhereExp "where (1) + (2)"
+          ~?= Right (Op2 (CompVal (LitInt 1)) (Arith Plus) (CompVal (LitInt 2))),
+        parseWhereExp "where col = \"hello\""
+          ~?= Right (Op2 (CompVal (ColName "col")) (Comp Eq) (CompVal (LitString "hello"))),
+        parseWhereExp "where col is null"
+          ~?= Right (Op1 (CompVal (ColName "col")) IsNull)
+      ]
+
 -- GROUP BY Expression Tests
 test_parseGroupByExp :: Test
 test_parseGroupByExp =

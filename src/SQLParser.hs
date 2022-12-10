@@ -276,21 +276,12 @@ whereExpP = compP
     prodP = uopexpP `P.chainl1` opAtLevel (level (Arith Times))
     uopexpP =
       baseP
-        <|> Op1 <$> uopP <*> uopexpP
+        <|> Op1 <$> uopexpP <*> uopP
     baseP =
       CompVal <$> comparableP
         <|> parens whereExpP
 
--- >>> parseWhereExp "where 1 + 2"
--- Right (CompVal (LitInt 1))
-
--- >>> parseWhereExp "where (1) + (2)"
--- Right (Op2 (CompVal (LitInt 1)) (Arith Plus) (CompVal (LitInt 2)))
-
--- >>> parseWhereExp "where col = \"hello\""
--- Right (Op2 (CompVal (ColName "col")) (Comp Eq) (CompVal (LitString "hello")))
-
--- Parses string literals
+-- | Parses string literals
 -- (non-quote characters enclosed in-between escaped double quotes)
 litStringP :: Parser String
 litStringP = P.between (P.char '\"') (many $ P.satisfy (/= '\"')) (stringP "\"")
@@ -329,7 +320,11 @@ bopP =
 
 -- | Parses unary operators
 uopP :: Parser Uop
-uopP = P.choice [constP "is null" IsNull, constP "is not null" IsNotNull]
+uopP =
+  P.choice
+    [ constP "is null" IsNull,
+      constP "is not null" IsNotNull
+    ]
 
 groupByTokenP :: Parser ()
 groupByTokenP = stringP "group by"
