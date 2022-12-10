@@ -21,7 +21,7 @@ data BoolExp
   | OpA Comparable ArithOp Comparable -- Arithmetic Operations
   -- TODO: change the line below so that it takes in Expressions (Comparables?)
   -- and not Bools
-  | OpL Bool LogicOp Bool
+  | OpL BoolExp LogicOp BoolExp
   | OpN NullOp ColName -- isna() / notna() in Pandas
   deriving (Eq, Show)
 
@@ -32,6 +32,22 @@ data Comparable
   | LitString String -- literal strings
   | LitDouble Double -- literal doubles
   deriving (Eq, Show)
+
+-- Datatype representing unary/binary operators
+data Bop = CompOp CompOp | ArithOp ArithOp | LogicOp LogicOp
+  deriving (Eq, Show)
+
+-- Binary operator precedence
+-- (similar to Haskell's operator precedence)
+level :: Bop -> Int
+level (LogicOp Or) = 2
+level (LogicOp And) = 3
+level (CompOp _) = 4
+level (ArithOp Plus) = 6
+level (ArithOp Minus) = 6
+level (ArithOp Times) = 7
+level (ArithOp Divide) = 7
+level (ArithOp Modulo) = 7
 
 -- Comparison (binary) operations that return a Boolean
 data CompOp

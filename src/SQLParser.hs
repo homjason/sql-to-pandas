@@ -251,7 +251,7 @@ compOpP :: Parser CompOp
 compOpP = constP "=" Eq <|> constP ">" Gt <|> constP ">=" Ge <|> constP "<" Lt <|> constP "<=" Le
 
 arithOpP :: Parser ArithOp
-arithOpP = wsP $ constP "+" Plus <|> constP "-" Minus <|> constP "*" Times <|> constP "//" Divide <|> constP "%" Modulo
+arithOpP = constP "+" Plus <|> constP "-" Minus <|> constP "*" Times <|> constP "/" Divide <|> constP "%" Modulo
 
 logicOpP :: Parser LogicOp
 logicOpP = constP "and" And <|> constP "or" Or
@@ -263,7 +263,7 @@ parseWhereExp str = case P.doParse whereTokenP str of
   Just ((), remainderStr) ->
     let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
      in case cols of
-          [] -> Left "No columns selected to Group By"
+          [] -> Left "No columns selected in Group By"
           hd : tl -> undefined
 
 groupByTokenP :: Parser ()
