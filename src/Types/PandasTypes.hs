@@ -40,12 +40,11 @@ instance Monoid Block where
 
 -- Pandas functions
 -- For AggFunc, the 1st ColName arg is the column we're aggregating over
--- and the 2nd ColName arg is the new (alias) name for the aggregated column
 data Func
   = SortValues ColName Order
   | Rename (Map ColName ColName)
   | GroupBy [ColName]
-  | Aggregate AggFunc ColName ColName
+  | Aggregate AggFunc ColName
   | Loc WhereExp -- filtering on rows (akin to WHERE in SQL)
   | Merge MergeExp
   | Unique [ColName]

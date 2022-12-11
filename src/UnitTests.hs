@@ -288,15 +288,87 @@ selectStarCommand =
 test_translateSQLSimple :: Test
 test_translateSQLSimple =
   "simple SQL queries to Pandas"
-    ~: TestList
-      [ translateSQL selectStarQ ~?= Block [selectStarCommand]
-      ]
+    ~: TestList []
+
+--       [ translateSQL selectStarQ ~?= Block [selectStarCommand]
+--       ]
 
 -- Converting "SELECT" expressions into list of colnames in Pandas
--- test_selectExpToCols :: Test
--- test_selectExpToCols =
---   "translating SQL SELECT to Pandas"
---     ~: TestList
---       [ selectExpToCols $ Star ~?= ([] :: [ColName]),
---         selectExpToCols $ Cols ["colA", "colB", "colC"] ~?= ["colA", "colB", "colC"]
---       ]
+test_selectExpToCols :: Test
+test_selectExpToCols =
+  "translating SQL SELECT to Pandas"
+    ~: TestList
+      [ selectExpToCols Star ~?= ([] :: [ColName], Nothing),
+        selectExpToCols (Cols [Col "colA", Col "colB"]) ~?= (["colA", "colB"], Nothing),
+        selectExpToCols (DistinctCols [Col "colA", Col "colB"])
+          ~?= (["colA", "colB"], Just [Unique ["colA", "colB"]]),
+        selectExpToCols (Cols [Col "colA", Agg Count "colB"])
+          ~?= (["colA", "colB"], Just [Aggregate Count "colB"]),
+        selectExpToCols (Cols []) ~?= ([], Nothing),
+        selectExpToCols (DistinctCols []) ~?= ([], Nothing)
+      ]
+
+test_translateJoinExp :: Test
+test_translateJoinExp =
+  "translating SQL JOIN ON to Pandas Merge"
+    ~: TestList
+      [ translateJoinExp (Join "A" "id" "B" "id" InnerJoin)
+          ~?= Merge
+            MkMerge
+              { rightDf = "B",
+                leftOn = "id",
+                rightOn = "id",
+                how = InnerJoin
+              }
+      ]
+
+test_translateFromExp :: Test
+test_translateFromExp =
+  "translating SQL FROM to Pandas"
+    ~: TestList
+      [ translateFromExp (Table "A" Nothing) ~?= ("A", Nothing),
+        translateFromExp (Table "A" (Just $ Join "A" "id" "B" "id" InnerJoin))
+          ~?= ( "A",
+                Just $
+                  Merge $
+                    MkMerge
+                      { rightDf = "B",
+                        leftOn = "id",
+                        rightOn = "id",
+                        how = InnerJoin
+                      }
+              )
+      ]
+
+test_whereExpToLoc :: Test
+test_whereExpToLoc =
+  "translating SQL WHERE to Pandas Loc"
+    ~: TestList
+      [ whereExpToLoc (Just $ Op2 (CompVal (ColName "col")) (Comp Eq) (CompVal (LitString "hello")))
+          ~?= [Loc (Op2 (CompVal (ColName "col")) (Comp Eq) (CompVal (LitString "hello")))],
+        whereExpToLoc Nothing ~?= []
+      ]
+
+test_limitExpToHead :: Test
+test_limitExpToHead =
+  "translating SQL LIMIT to Pandas Head"
+    ~: TestList
+      [ limitExpToHead (Just 5) ~?= [Head 5],
+        limitExpToHead Nothing ~?= []
+      ]
+
+test_orderByToSortValues :: Test
+test_orderByToSortValues =
+  "translating SQL ORDER BY to Pandas Sort Values"
+    ~: TestList
+      [ orderByToSortValues (Just ("col1", Asc)) ~?= [SortValues "col1" Asc],
+        orderByToSortValues Nothing ~?= []
+      ]
+
+test_groupByToPandasGroupBy :: Test
+test_groupByToPandasGroupBy =
+  "translating SQL GROUP BY to Pandas Group By"
+    ~: TestList
+      [ groupByToPandasGroupBy Nothing ~?= [],
+        groupByToPandasGroupBy (Just ["col1", "col2"]) ~?= [Pandas.GroupBy ["col1", "col2"]]
+      ]

@@ -11,8 +11,8 @@ import Parser (Parser)
 import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
+import Translator (getAggFuncs, getColExps, getColNames)
 import Types.SQLTypes
--- import Types.SQLTypes (ColExp (..), FromExp, JoinExp, LimitExp (Limit), Query, RenameOp, SelectExp (..))
 import Types.TableTypes
 import Types.Types
 
@@ -267,6 +267,8 @@ parseWhereExp str = case P.doParse whereTokenP str of
 
 -- QUESTION FOR JOE: we need to enclose each literal int in parentheses in order
 -- for this function to work, not sure how to fix this
+-- OTHER QUESTION: We're having trouble parsing postfix unary operators (IS NULL, IS NOT NULL) --> we were following the LuParser paradigm but it only handles prefix unary operators, not postfix
+
 whereExpP :: Parser WhereExp
 whereExpP = compP
   where
@@ -379,9 +381,6 @@ renameOpP = undefined
 
 aggFuncOp :: Parser AggFunc
 aggFuncOp = undefined
-
--- nullOpP :: Parser NullOp
--- nullOpP = undefined "TODO"
 
 -- Datatype that encapsulates various SQL query conditions
 -- (WHERE / GROUP BY / ORDER BY / LIMIT)
@@ -508,3 +507,21 @@ splitQueryString = map stripSpace . lines . map toLower
 -- parseSqlFile = P.parseFromFile (const <$> parseQuery <*> P.eof)
 
 -- nullOpP = wsP $ P.string "IS NULL" *> pure isNull
+
+-- | Checks if a Query contains valid SQL syntax / is semantically correct
+-- (this function will be used in QuickCheck properties as a precondition)
+-- TODO: check if cols in AggFuncs are present in GROUPBYs (can't have AggFunc without groupby)
+-- TODO: check that we only have either DISTINCT or AggFuncs in a SelectExp (can't have both)
+-- TODO: Checks that it definitely has SELECT and FROM clauses in the correct order
+-- TODO: make sure that any DISTINCTs appear at the beginning of the SELECT expression
+-- TODO: make sure that DISTINCTs can't be used with an empty list of ColNames
+validateQuery :: Query -> Bool
+validateQuery q@(Query s f w g o l) = undefined
+
+-- | Checks if cols in AggFuncs are present in GROUPBYs (can't have AggFunc without groupby)
+aggFuncColsInGroupBy :: Query -> Bool
+aggFuncColsInGroupBy (Query s _ _ g _ _) =
+  case g of
+    Nothing -> undefined
+    Just [] -> False -- GROUPBY expression is malformed (columns not specified)
+    Just (c : cs) -> undefined
