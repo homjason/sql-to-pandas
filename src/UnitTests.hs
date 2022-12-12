@@ -491,14 +491,6 @@ selectStarCommand =
       fn = Nothing
     }
 
-test_translateSQLSimple :: Test
-test_translateSQLSimple =
-  "simple SQL queries to Pandas"
-    ~: TestList []
-
---       [ translateSQL selectStarQ ~?= Block [selectStarCommand]
---       ]
-
 -- Converting "SELECT" expressions into list of colnames in Pandas
 test_selectExpToCols :: Test
 test_selectExpToCols =
@@ -625,8 +617,38 @@ test_translateSQL =
           )
           ~?= Command
             { df = "table",
+              cols = Just ["col1", "col2"],
+              fn = Just [Pandas.GroupBy ["col1"], ResetIndex, Aggregate Count "col2"]
+            },
+        translateSQL
+          ( Query
+              { select = Cols [Col "col"],
+                from = Table "table" Nothing,
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Just ("col", Asc),
+                limit = Nothing
+              }
+          )
+          ~?= Command
+            { df = "table",
               cols = Just ["col"],
-              fn = Just [Pandas.GroupBy ["col1"], ResetIndex]
+              fn = Just [SortValues "col" Asc]
+            },
+        translateSQL
+          ( Query
+              { select = Cols [Col "col", Col "col2"],
+                from = Table "table" Nothing,
+                wher = Just $ Op2 (CompVal $ ColName "col") (Comp Gt) (CompVal $ LitInt 4),
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= Command
+            { df = "table",
+              cols = Just ["col", "col2"],
+              fn = Just [Loc $ Op2 (CompVal $ ColName "col") (Comp Gt) (CompVal $ LitInt 4)]
             }
       ]
 

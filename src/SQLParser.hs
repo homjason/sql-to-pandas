@@ -13,8 +13,9 @@ import Parser (Parser)
 import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
-import Translator (decompColExps, getAggCols, getAggFuncs, getColNames, getNonAggCols)
-import Types.SQLTypes
+import Translator (decompColExps, getAggCols, getAggFuncs, getColNames, getNonAggCols, translateSQL) -- TEMPORARY
+import Types.PandasTypes as Pandas -- TEMPORARY
+import Types.SQLTypes as SQL
 import Types.TableTypes
 import Types.Types
 
@@ -399,7 +400,7 @@ inferCondition str =
     Right whereExp -> Right $ Wher whereExp
     Left e1 ->
       case parseGroupByExp str of
-        Right groupByCols -> Right $ GroupBy groupByCols
+        Right groupByCols -> Right $ SQL.GroupBy groupByCols
         Left e2 ->
           case parseOrderByExp str of
             Right orderByExp -> Right $ OrderBy orderByExp
@@ -413,7 +414,7 @@ mkQuery :: SelectExp -> FromExp -> Condition -> Query
 mkQuery s f condition =
   case condition of
     Wher w -> Query s f (Just w) Nothing Nothing Nothing
-    GroupBy gb -> Query s f Nothing (Just gb) Nothing Nothing
+    SQL.GroupBy gb -> Query s f Nothing (Just gb) Nothing Nothing
     OrderBy ob -> Query s f Nothing Nothing (Just ob) Nothing
     Limit l -> Query s f Nothing Nothing Nothing (Just l)
 
@@ -422,11 +423,11 @@ mkQuery s f condition =
 mkQuery2 :: SelectExp -> FromExp -> Condition -> Condition -> Either P.ParseError Query
 mkQuery2 s f c1 c2 =
   case (c1, c2) of
-    (Wher w, GroupBy gb) -> Right $ Query s f (Just w) (Just gb) Nothing Nothing
+    (Wher w, SQL.GroupBy gb) -> Right $ Query s f (Just w) (Just gb) Nothing Nothing
     (Wher w, OrderBy ob) -> Right $ Query s f (Just w) Nothing (Just ob) Nothing
     (Wher w, Limit l) -> Right $ Query s f (Just w) Nothing Nothing (Just l)
-    (GroupBy gb, OrderBy ob) -> Right $ Query s f Nothing (Just gb) (Just ob) Nothing
-    (GroupBy gb, Limit l) -> Right $ Query s f Nothing (Just gb) Nothing (Just l)
+    (SQL.GroupBy gb, OrderBy ob) -> Right $ Query s f Nothing (Just gb) (Just ob) Nothing
+    (SQL.GroupBy gb, Limit l) -> Right $ Query s f Nothing (Just gb) Nothing (Just l)
     (OrderBy o, Limit l) -> Right $ Query s f Nothing Nothing (Just o) (Just l)
     (_, _) -> Left "Malformed SQL query, couldn't infer query conditions"
 
@@ -441,11 +442,11 @@ mkQuery3 ::
   Either P.ParseError Query
 mkQuery3 s f c1 c2 c3 =
   case (c1, c2, c3) of
-    (Wher w, GroupBy gb, OrderBy ob) ->
+    (Wher w, SQL.GroupBy gb, OrderBy ob) ->
       Right $ Query s f (Just w) (Just gb) (Just ob) Nothing
     (Wher w, OrderBy ob, Limit l) ->
       Right $ Query s f (Just w) Nothing (Just ob) (Just l)
-    (GroupBy gb, OrderBy ob, Limit l) ->
+    (SQL.GroupBy gb, OrderBy ob, Limit l) ->
       Right $ Query s f Nothing (Just gb) (Just ob) (Just l)
     (_, _, _) -> Left "Malformed SQL query, couldn't infer query conditions"
 
@@ -475,22 +476,22 @@ parseQuery str =
       s <- parseSelectExp select
       f <- parseFromExp from
       case (inferCondition c1, inferCondition c2) of
-        (Right w@(Wher _), Right gb@(GroupBy _)) -> mkQuery2 s f w gb
+        (Right w@(Wher _), Right gb@(SQL.GroupBy _)) -> mkQuery2 s f w gb
         (Right w@(Wher _), Right ob@(OrderBy _)) -> mkQuery2 s f w ob
         (Right w@(Wher _), Right l@(Limit _)) -> mkQuery2 s f w l
-        (Right gb@(GroupBy _), Right ob@(OrderBy _)) -> mkQuery2 s f gb ob
-        (Right gb@(GroupBy _), Right l@(Limit _)) -> mkQuery2 s f gb l
+        (Right gb@(SQL.GroupBy _), Right ob@(OrderBy _)) -> mkQuery2 s f gb ob
+        (Right gb@(SQL.GroupBy _), Right l@(Limit _)) -> mkQuery2 s f gb l
         (Right ob@(OrderBy _), Right l@(Limit _)) -> mkQuery2 s f ob l
         (_, _) -> Left "Malformed SQL query"
     [select, from, c1, c2, c3] -> do
       s <- parseSelectExp select
       f <- parseFromExp from
       case (inferCondition c1, inferCondition c2, inferCondition c3) of
-        (Right w@(Wher _), Right gb@(GroupBy _), Right ob@(OrderBy _)) ->
+        (Right w@(Wher _), Right gb@(SQL.GroupBy _), Right ob@(OrderBy _)) ->
           mkQuery3 s f w gb ob
         (Right w@(Wher _), Right ob@(OrderBy _), Right l@(Limit _)) ->
           mkQuery3 s f w ob l
-        (Right gb@(GroupBy _), Right ob@(OrderBy _), Right l@(Limit _)) ->
+        (Right gb@(SQL.GroupBy _), Right ob@(OrderBy _), Right l@(Limit _)) ->
           mkQuery3 s f gb ob l
         (_, _, _) -> Left "Malformed SQL query"
     [select, from, wher, groupBy, orderBy, limit] -> do
@@ -575,3 +576,9 @@ noDistinctAndGroupBy :: SelectExp -> Maybe [ColName] -> Bool
 noDistinctAndGroupBy select@(DistinctCols _) groupBy@(Just _) = False
 noDistinctAndGroupBy _ (Just _) = True
 noDistinctAndGroupBy _ Nothing = True
+
+-- Parses the string into a query and translates it into a Pandas Command
+runParseAndTranslate :: String -> Either P.ParseError Command
+runParseAndTranslate s = case parseQuery s of
+  Left str -> Left str
+  Right q -> if validateQuery q then Right $ translateSQL q else Left "Invalid Query"
