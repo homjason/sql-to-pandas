@@ -267,6 +267,78 @@ test_parseJoinExp =
 --------------------------------------------------------------------------------
 -- Unit Tests for validateQuery & its helper functions
 
+-- TODO: fix failing test cases
+-- TODO: check that we can't call AggFuncs on a group by column
+test_validateQuery :: Test
+test_validateQuery =
+  "checking SQL query validation"
+    ~: TestList
+      [ validateQuery (mkQuery (Cols []) df (SQL.GroupBy [])) ~?= False,
+        validateQuery (mkQuery (Cols [Col "col1"]) df (SQL.GroupBy [])) ~?= False,
+        validateQuery (mkQuery Star df (SQL.GroupBy ["col1"])) ~?= False,
+        validateQuery (mkQuery Star df (SQL.GroupBy [])) ~?= False,
+        validateQuery
+          ( mkQuery
+              (Cols [Col "col1"])
+              df
+              (SQL.GroupBy ["col2"])
+          )
+          ~?= False,
+        validateQuery
+          ( mkQuery
+              (DistinctCols [Col "col1"])
+              df
+              (SQL.GroupBy ["col1"])
+          )
+          ~?= False,
+        validateQuery
+          ( mkQuery
+              (Cols [Col "col1"])
+              df
+              (SQL.GroupBy ["col1"])
+          )
+          ~?= True,
+        validateQuery
+          ( mkQuery
+              (Cols [Col "col1", Col "col2"])
+              df
+              (SQL.GroupBy ["col1"])
+          )
+          ~?= True,
+        validateQuery
+          ( mkQuery
+              (Cols [Col "col1", Agg Count "col2"])
+              df
+              (SQL.GroupBy ["col1"])
+          )
+          ~?= True,
+        validateQuery
+          ( mkQuery
+              (Cols [Agg Count "col1", Agg Count "col2"])
+              df
+              (SQL.GroupBy ["col1", "col2"])
+          )
+          ~?= False
+      ]
+  where
+    df = Table "df" Nothing
+
+-- >>> runTestTT test_validateQuery
+-- Counts {cases = 10, tried = 10, errors = 0, failures = 3}
+
+test_selectExpIsNonEmpty :: Test
+test_selectExpIsNonEmpty =
+  "checking that SELECT expressions are non-empty"
+    ~: TestList
+      [ selectExpIsNonEmpty (Cols [Col "col1"]) ~?= True,
+        selectExpIsNonEmpty (Cols [Col "col1", Col "col2"]) ~?= True,
+        selectExpIsNonEmpty (DistinctCols [Col "col1"]) ~?= False,
+        selectExpIsNonEmpty (DistinctCols [Col "col1", Col "Col2"]) ~?= False,
+        selectExpIsNonEmpty (Cols []) ~?= False,
+        selectExpIsNonEmpty (DistinctCols []) ~?= False,
+        selectExpIsNonEmpty Star ~?= True
+      ]
+
 test_groupByColsInSelectExp :: Test
 test_groupByColsInSelectExp =
   "checking if cols in GROUP BY = cols in SELECT expression"
@@ -327,6 +399,35 @@ test_groupByColsInSelectExp =
       ]
   where
     df = Table "df" Nothing
+
+test_distinctHasNoAggFuncs :: Test
+test_distinctHasNoAggFuncs =
+  "checking that DISTINCT doesn't coincide w/ aggregate functions"
+    ~: TestList
+      [ distinctHasNoAggFuncs (DistinctCols [Agg Count "col1"])
+          ~?= False,
+        distinctHasNoAggFuncs (DistinctCols [Col "col1", Agg Count "col2"])
+          ~?= False,
+        distinctHasNoAggFuncs (DistinctCols [Agg Count "col1", Agg Count "col2"])
+          ~?= False,
+        distinctHasNoAggFuncs (DistinctCols [Col "col1", Col "col2"])
+          ~?= True,
+        distinctHasNoAggFuncs (DistinctCols [])
+          ~?= True,
+        distinctHasNoAggFuncs (DistinctCols [Col "col1", Col "col2", Col "col3"])
+          ~?= True
+      ]
+
+test_noDistinctAndGroupBy :: Test
+test_noDistinctAndGroupBy =
+  "checking that DISTINCTs & GROUP BYs never appear together"
+    ~: TestList
+      [ noDistinctAndGroupBy (DistinctCols [Col "col1"]) (Just ["col1"]) ~?= False,
+        noDistinctAndGroupBy (DistinctCols [Col "col1"]) (Just []) ~?= False,
+        noDistinctAndGroupBy (DistinctCols [Col "col1"]) Nothing ~?= True,
+        noDistinctAndGroupBy (Cols [Col "Col1"]) Nothing ~?= True,
+        noDistinctAndGroupBy Star Nothing ~?= True
+      ]
 
 --------------------------------------------------------------------------------
 -- TRANSLATOR unit tests

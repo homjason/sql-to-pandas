@@ -503,13 +503,19 @@ splitQueryString = map stripSpace . lines . map toLower
 
 -- | Checks if a Query contains valid SQL syntax / is semantically correct
 -- (this function will be used in QuickCheck properties as a precondition)
--- TODO: check that we only have either DISTINCT or AggFuncs in a SelectExp (can't have both) ==> this implies that we can't have DISTINCT & GROUP BYs together
--- TODO: Checks that it definitely has SELECT and FROM clauses in the correct order
--- TODO: make sure that any DISTINCTs appear at the beginning of the SELECT expression
--- TODO: make sure that DISTINCTs can't be used with an empty list of ColNames
 validateQuery :: Query -> Bool
 validateQuery q@(Query s f w g o l) =
-  groupByColsInSelectExp q && undefined "TODO: check other conditions"
+  selectExpIsNonEmpty s
+    && groupByColsInSelectExp q
+    && distinctHasNoAggFuncs s
+    && noDistinctAndGroupBy s g
+
+-- Check that we don't have any SELECT / SELECT DISTINCT expressions
+-- without any column names specified
+selectExpIsNonEmpty :: SelectExp -> Bool
+selectExpIsNonEmpty (Cols []) = False
+selectExpIsNonEmpty (DistinctCols []) = False
+selectExpIsNonEmpty _ = True
 
 -- | Checks if columns in GROUP BY expressions are in SELECT expressions
 groupByColsInSelectExp :: Query -> Bool
@@ -526,3 +532,18 @@ groupByColsInSelectExp (Query s _ _ g _ _) =
     -- Check if columns in SELECT expression == columns in GROUP BY
     (Cols cExps, Just grpCols@(_ : _)) ->
       Set.fromList ((getColNames . decompColExps) cExps) == Set.fromList grpCols
+
+-- Check that there are no aggregate functions when the DISTINCT keyword is used
+distinctHasNoAggFuncs :: SelectExp -> Bool
+distinctHasNoAggFuncs (DistinctCols []) = True
+distinctHasNoAggFuncs (DistinctCols (c : cs)) =
+  case c of
+    Col _ -> distinctHasNoAggFuncs (DistinctCols cs)
+    Agg _ _ -> False
+distinctHasNoAggFuncs _ = True
+
+-- Check that we can't have DISTINCT & GROUP BYs together in the same query
+noDistinctAndGroupBy :: SelectExp -> Maybe [ColName] -> Bool
+noDistinctAndGroupBy select@(DistinctCols _) groupBy@(Just _) = False
+noDistinctAndGroupBy _ (Just _) = True
+noDistinctAndGroupBy _ Nothing = True
