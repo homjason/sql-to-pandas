@@ -7,7 +7,7 @@ import Parser (Parser)
 import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
-import Types.PandasTypes
+import Types.PandasTypes as Pandas
 import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
@@ -36,14 +36,14 @@ getFuncs q@(Query s f w gb ob l) =
     ++ limitExpToHead l
 
 -- Converts a list of ColExps into list of pairs consisting of colnames & aggregate functions
-getColExps :: [ColExp] -> [(ColName, Maybe Func)]
-getColExps = map deconstructColExp
+decompColExps :: [ColExp] -> [(ColName, Maybe Func)]
+decompColExps = map decompose
   where
-    -- Deconstructs a ColExp into its constituent colname & aggregate function
+    -- Decomposes a ColExp into its constituent colname & aggregate function
     -- (if it exists)
-    deconstructColExp :: ColExp -> (ColName, Maybe Func)
-    deconstructColExp (Col col) = (col, Nothing)
-    deconstructColExp (Agg f col) = (col, Just $ Aggregate f col)
+    decompose :: ColExp -> (ColName, Maybe Func)
+    decompose (Col col) = (col, Nothing)
+    decompose (Agg f col) = (col, Just $ Aggregate f col)
 
 -- | Extracts a list of colnames from a list of deconstructed ColExps
 getColNames :: [(ColName, Maybe Func)] -> [ColName]
@@ -64,12 +64,12 @@ getAggFuncs = mapMaybe snd
 selectExpToCols :: SelectExp -> ([ColName], Maybe [Func])
 selectExpToCols Star = ([], Nothing)
 selectExpToCols (Cols cs) =
-  let cExps = getColExps cs
+  let cExps = decompColExps cs
    in case getAggFuncs cExps of
         [] -> (getColNames cExps, Nothing)
         funcs@(f : fs) -> (getColNames cExps, Just funcs)
 selectExpToCols (DistinctCols cols) =
-  let cNames = (getColNames . getColExps) cols
+  let cNames = (getColNames . decompColExps) cols
    in (cNames, Just [Unique cNames])
 
 getColsFromSelectTranslation :: ([ColName], Maybe [Func]) -> [ColName]
@@ -134,4 +134,4 @@ getAggs cExps = [x | x@(Agg f cols) <- cExps]
 groupByToPandasGroupBy :: Maybe [ColName] -> [Func]
 groupByToPandasGroupBy cols = case cols of
   Nothing -> []
-  Just cs -> [GroupBy cs]
+  Just cs -> [Pandas.GroupBy cs]

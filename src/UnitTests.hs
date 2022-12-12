@@ -264,7 +264,72 @@ test_parseJoinExp =
 --         P.parse doubleValP "-3.00" ~?= Right (DoubleVal (-3.0 :: Double))
 --       ]
 
-{- TRANSLATOR unit tests -}
+--------------------------------------------------------------------------------
+-- Unit Tests for validateQuery & its helper functions
+
+test_groupByColsInSelectExp :: Test
+test_groupByColsInSelectExp =
+  "checking if cols in GROUP BY = cols in SELECT expression"
+    ~: TestList
+      [ groupByColsInSelectExp (Query Star df Nothing Nothing Nothing Nothing)
+          ~?= False,
+        groupByColsInSelectExp (mkQuery Star df (SQL.GroupBy [])) ~?= False,
+        groupByColsInSelectExp (mkQuery Star df (SQL.GroupBy ["col1", "col2"])) ~?= False,
+        groupByColsInSelectExp
+          ( mkQuery
+              (DistinctCols [])
+              df
+              (SQL.GroupBy ["col1", "col2"])
+          )
+          ~?= False,
+        groupByColsInSelectExp
+          ( mkQuery
+              (DistinctCols [Col "col1"])
+              df
+              (SQL.GroupBy ["col1", "col2"])
+          )
+          ~?= False,
+        groupByColsInSelectExp
+          ( mkQuery
+              (Cols [Col "col1"])
+              df
+              (SQL.GroupBy ["col1", "col2"])
+          )
+          ~?= False,
+        groupByColsInSelectExp
+          ( mkQuery
+              (Cols [Col "col1", Col "col2"])
+              df
+              (SQL.GroupBy ["col1", "col2"])
+          )
+          ~?= True,
+        groupByColsInSelectExp
+          ( mkQuery
+              (Cols [Col "col2", Col "col1"])
+              df
+              (SQL.GroupBy ["col1", "col2"])
+          )
+          ~?= True,
+        groupByColsInSelectExp
+          ( mkQuery
+              (Cols [Col "col1", Agg Count "col2"])
+              df
+              (SQL.GroupBy ["col1", "col2"])
+          )
+          ~?= True,
+        groupByColsInSelectExp
+          ( mkQuery
+              (Cols [Agg Avg "col1", Agg Count "col2"])
+              df
+              (SQL.GroupBy ["col1", "col2"])
+          )
+          ~?= True
+      ]
+  where
+    df = Table "df" Nothing
+
+--------------------------------------------------------------------------------
+-- TRANSLATOR unit tests
 
 selectStarQ :: Query
 selectStarQ =

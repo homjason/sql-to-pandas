@@ -22,6 +22,15 @@ data Query = Query
   }
   deriving (Eq, Show)
 
+-- Datatype that encapsulates various SQL query conditions
+-- (WHERE / GROUP BY / ORDER BY / LIMIT)
+data Condition
+  = Wher WhereExp
+  | GroupBy [ColName]
+  | OrderBy (ColName, Order)
+  | Limit Int
+  deriving (Eq, Show)
+
 -- Datatype for SELECT clauses in SQL
 data SelectExp
   = Cols [ColExp] -- colnames are a list of string names

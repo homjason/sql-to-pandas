@@ -7,11 +7,13 @@ import Data.Either (rights)
 import Data.Functor (($>))
 import Data.List (dropWhileEnd, foldl')
 import Data.List.Split (splitOn)
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Parser (Parser)
 import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
-import Translator (getAggFuncs, getColExps, getColNames)
+import Translator (decompColExps, getAggFuncs, getColNames)
 import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
@@ -382,15 +384,6 @@ renameOpP = undefined
 aggFuncOp :: Parser AggFunc
 aggFuncOp = undefined
 
--- Datatype that encapsulates various SQL query conditions
--- (WHERE / GROUP BY / ORDER BY / LIMIT)
-data Condition
-  = Wher WhereExp
-  | GroupBy [ColName]
-  | OrderBy (ColName, Order)
-  | Limit Int
-  deriving (Eq, Show)
-
 -- TODO: In the function inferCondition, use alternative instead of nested cases
 -- (change return type of ParseGroupByExp, parseOrderByExp etc. to
 -- Parser a instead of using Either monad)
@@ -510,18 +503,26 @@ splitQueryString = map stripSpace . lines . map toLower
 
 -- | Checks if a Query contains valid SQL syntax / is semantically correct
 -- (this function will be used in QuickCheck properties as a precondition)
--- TODO: check if cols in AggFuncs are present in GROUPBYs (can't have AggFunc without groupby)
--- TODO: check that we only have either DISTINCT or AggFuncs in a SelectExp (can't have both)
+-- TODO: check that we only have either DISTINCT or AggFuncs in a SelectExp (can't have both) ==> this implies that we can't have DISTINCT & GROUP BYs together
 -- TODO: Checks that it definitely has SELECT and FROM clauses in the correct order
 -- TODO: make sure that any DISTINCTs appear at the beginning of the SELECT expression
 -- TODO: make sure that DISTINCTs can't be used with an empty list of ColNames
 validateQuery :: Query -> Bool
-validateQuery q@(Query s f w g o l) = undefined
+validateQuery q@(Query s f w g o l) =
+  groupByColsInSelectExp q && undefined "TODO: check other conditions"
 
--- | Checks if cols in AggFuncs are present in GROUPBYs (can't have AggFunc without groupby)
-aggFuncColsInGroupBy :: Query -> Bool
-aggFuncColsInGroupBy (Query s _ _ g _ _) =
-  case g of
-    Nothing -> undefined
-    Just [] -> False -- GROUPBY expression is malformed (columns not specified)
-    Just (c : cs) -> undefined
+-- | Checks if columns in GROUP BY expressions are in SELECT expressions
+groupByColsInSelectExp :: Query -> Bool
+groupByColsInSelectExp (Query s _ _ g _ _) =
+  case (s, g) of
+    -- Empty GROUP BY expressions are invalid
+    (_, Nothing) -> False
+    -- GROUP BY expression is malformed (columns not specified)
+    (_, Just []) -> False
+    -- We explcitly disallow the use of SELECT * in queries involving GROUP BYs
+    (Star, Just (_ : _)) -> False
+    -- DISTINCT & GROUP BY not allowed to coexist
+    (DistinctCols _, Just (_ : _)) -> False
+    -- Check if columns in SELECT expression == columns in GROUP BY
+    (Cols cExps, Just grpCols@(_ : _)) ->
+      Set.fromList ((getColNames . decompColExps) cExps) == Set.fromList grpCols
