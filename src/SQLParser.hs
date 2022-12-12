@@ -531,6 +531,9 @@ validateQuery q@(Query s f w gb ob l) = do
   v4 <- noDistinctAndGroupBy s gb
   Right (v1 && v2 && v3 && v4)
 
+-- >>> validateQuery $ Query (Cols [Col "col1"]) (Table "df" Nothing) Nothing (Just ["col1"]) Nothing Nothing
+-- False
+
 -- Check that we don't have any SELECT / SELECT DISTINCT expressions
 -- without any column names specified
 selectExpIsNonEmpty :: SelectExp -> Either P.ParseError Bool
@@ -562,6 +565,12 @@ groupByColsInSelectExp (Query s _ _ g _ _) =
                 && grpColsSet `isSubsetOf` aggColSet
                 then Right True
                 else Left "Columns in SELECT expression /= columns in GROUP BY"
+
+-- >>> groupByColsInSelectExp (mkQuery (Cols [Col "col1", Col "col2"]) (Table "df" Nothing) (SQL.GroupBy ["col1", "col2"]))
+-- Left "Columns in SELECT expression /= columns in GROUP BY"
+
+-- >>> decompColExps [Col "col1", Col "col2"]
+-- [("col1",Nothing),("col2",Nothing)]
 
 -- Check that there are no aggregate functions when the DISTINCT keyword is used
 distinctHasNoAggFuncs :: SelectExp -> Either P.ParseError Bool
