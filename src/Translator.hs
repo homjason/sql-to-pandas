@@ -36,7 +36,11 @@ moveResetIndex fns =
        in newFns ++ [ResetIndex]
     else fns
 
+-- >>> moveResetIndex [Pandas.GroupBy ["col1"], ResetIndex, Aggregate Count "col2"]
+-- [GroupBy ["col1"],Aggregate Count "col2",ResetIndex]
+
 -- Given a SQL query, extracts a list of (equivalent) Pandas functions
+
 getFuncs :: Query -> Maybe [Func]
 getFuncs q@(Query s f w gb ob l) =
   let funcList = getJoinFunc (translateFromExp f) ++ whereExpToLoc w ++ groupByToPandasGroupBy gb ++ getFnsFromSelectTranslation (selectExpToCols s) ++ orderByToSortValues ob ++ limitExpToHead l
