@@ -6,6 +6,8 @@ module QuickCheckTests where
 import Data.Data (Data)
 -- import Data.Generics.Aliases (ext1Q)
 import Data.Maybe (isNothing)
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Parser (Parser)
 import Parser qualified as P
 import Print
@@ -17,6 +19,14 @@ import Types.PandasTypes
 import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
+
+-- Check that getAggCols & getNonAggCols are disjoint partitions of getColNames
+-- (helper functions called on ColExp)
+prop_getAggAndNonAggColsDisjoint :: [ColExp] -> Bool
+prop_getAggAndNonAggColsDisjoint cExps =
+  let cs = decompColExps cExps
+   in getAggCols cs `Set.union` getNonAggCols cs == getColNames cs
+        && getAggCols cs `Set.disjoint` getNonAggCols cs
 
 -- TODO: fix!
 genSelectExp :: Gen SelectExp

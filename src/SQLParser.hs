@@ -13,7 +13,7 @@ import Parser (Parser)
 import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
-import Translator (decompColExps, getAggFuncs, getColNames)
+import Translator (decompColExps, getAggCols, getAggFuncs, getColNames, getNonAggCols)
 import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
@@ -413,8 +413,8 @@ mkQuery :: SelectExp -> FromExp -> Condition -> Query
 mkQuery s f condition =
   case condition of
     Wher w -> Query s f (Just w) Nothing Nothing Nothing
-    GroupBy g -> Query s f Nothing (Just g) Nothing Nothing
-    OrderBy o -> Query s f Nothing Nothing (Just o) Nothing
+    GroupBy gb -> Query s f Nothing (Just gb) Nothing Nothing
+    OrderBy ob -> Query s f Nothing Nothing (Just ob) Nothing
     Limit l -> Query s f Nothing Nothing Nothing (Just l)
 
 -- | Construct a Query based on a SelectExp, FromExp & two conditions
@@ -422,11 +422,11 @@ mkQuery s f condition =
 mkQuery2 :: SelectExp -> FromExp -> Condition -> Condition -> Either P.ParseError Query
 mkQuery2 s f c1 c2 =
   case (c1, c2) of
-    (Wher w, GroupBy g) -> Right $ Query s f (Just w) (Just g) Nothing Nothing
-    (Wher w, OrderBy o) -> Right $ Query s f (Just w) Nothing (Just o) Nothing
+    (Wher w, GroupBy gb) -> Right $ Query s f (Just w) (Just gb) Nothing Nothing
+    (Wher w, OrderBy ob) -> Right $ Query s f (Just w) Nothing (Just ob) Nothing
     (Wher w, Limit l) -> Right $ Query s f (Just w) Nothing Nothing (Just l)
-    (GroupBy g, OrderBy o) -> Right $ Query s f Nothing (Just g) (Just o) Nothing
-    (GroupBy g, Limit l) -> Right $ Query s f Nothing (Just g) Nothing (Just l)
+    (GroupBy gb, OrderBy ob) -> Right $ Query s f Nothing (Just gb) (Just ob) Nothing
+    (GroupBy gb, Limit l) -> Right $ Query s f Nothing (Just gb) Nothing (Just l)
     (OrderBy o, Limit l) -> Right $ Query s f Nothing Nothing (Just o) (Just l)
     (_, _) -> Left "Malformed SQL query, couldn't infer query conditions"
 
@@ -441,12 +441,12 @@ mkQuery3 ::
   Either P.ParseError Query
 mkQuery3 s f c1 c2 c3 =
   case (c1, c2, c3) of
-    (Wher w, GroupBy g, OrderBy o) ->
-      Right $ Query s f (Just w) (Just g) (Just o) Nothing
-    (Wher w, OrderBy o, Limit l) ->
-      Right $ Query s f (Just w) Nothing (Just o) (Just l)
-    (GroupBy g, OrderBy o, Limit l) ->
-      Right $ Query s f Nothing (Just g) (Just o) (Just l)
+    (Wher w, GroupBy gb, OrderBy ob) ->
+      Right $ Query s f (Just w) (Just gb) (Just ob) Nothing
+    (Wher w, OrderBy ob, Limit l) ->
+      Right $ Query s f (Just w) Nothing (Just ob) (Just l)
+    (GroupBy gb, OrderBy ob, Limit l) ->
+      Right $ Query s f Nothing (Just gb) (Just ob) (Just l)
     (_, _, _) -> Left "Malformed SQL query, couldn't infer query conditions"
 
 -- | Wrapper function for all the query-parsing business logic
@@ -475,32 +475,32 @@ parseQuery str =
       s <- parseSelectExp select
       f <- parseFromExp from
       case (inferCondition c1, inferCondition c2) of
-        (Right w@(Wher _), Right g@(GroupBy _)) -> mkQuery2 s f w g
-        (Right w@(Wher _), Right o@(OrderBy _)) -> mkQuery2 s f w o
+        (Right w@(Wher _), Right gb@(GroupBy _)) -> mkQuery2 s f w gb
+        (Right w@(Wher _), Right ob@(OrderBy _)) -> mkQuery2 s f w ob
         (Right w@(Wher _), Right l@(Limit _)) -> mkQuery2 s f w l
-        (Right g@(GroupBy _), Right o@(OrderBy _)) -> mkQuery2 s f g o
-        (Right g@(GroupBy _), Right l@(Limit _)) -> mkQuery2 s f g l
-        (Right o@(OrderBy _), Right l@(Limit _)) -> mkQuery2 s f o l
+        (Right gb@(GroupBy _), Right ob@(OrderBy _)) -> mkQuery2 s f gb ob
+        (Right gb@(GroupBy _), Right l@(Limit _)) -> mkQuery2 s f gb l
+        (Right ob@(OrderBy _), Right l@(Limit _)) -> mkQuery2 s f ob l
         (_, _) -> Left "Malformed SQL query"
     [select, from, c1, c2, c3] -> do
       s <- parseSelectExp select
       f <- parseFromExp from
       case (inferCondition c1, inferCondition c2, inferCondition c3) of
-        (Right w@(Wher _), Right g@(GroupBy _), Right o@(OrderBy _)) ->
-          mkQuery3 s f w g o
-        (Right w@(Wher _), Right o@(OrderBy _), Right l@(Limit _)) ->
-          mkQuery3 s f w o l
-        (Right g@(GroupBy _), Right o@(OrderBy _), Right l@(Limit _)) ->
-          mkQuery3 s f g o l
+        (Right w@(Wher _), Right gb@(GroupBy _), Right ob@(OrderBy _)) ->
+          mkQuery3 s f w gb ob
+        (Right w@(Wher _), Right ob@(OrderBy _), Right l@(Limit _)) ->
+          mkQuery3 s f w ob l
+        (Right gb@(GroupBy _), Right ob@(OrderBy _), Right l@(Limit _)) ->
+          mkQuery3 s f gb ob l
         (_, _, _) -> Left "Malformed SQL query"
     [select, from, wher, groupBy, orderBy, limit] -> do
       s <- parseSelectExp select
       f <- parseFromExp from
       w <- parseWhereExp wher
-      g <- parseGroupByExp groupBy
-      o <- parseOrderByExp orderBy
+      gb <- parseGroupByExp groupBy
+      ob <- parseOrderByExp orderBy
       l <- parseLimitExp limit
-      Right $ Query s f (Just w) (Just g) (Just o) (Just l)
+      Right $ Query s f (Just w) (Just gb) (Just ob) (Just l)
     _ -> Left "Invalid SQL Query"
 
 -- Converts query string to lower case, splits on newlines
@@ -550,12 +550,16 @@ groupByColsInSelectExp (Query s _ _ g _ _) =
     (DistinctCols _, Just (_ : _)) -> False
     -- Check if columns in SELECT expression == columns in GROUP BY
     (Cols cExps, Just grpCols@(_ : _)) ->
-      Set.fromList ((getColNames . decompColExps) cExps) == Set.fromList grpCols
+      let (decompExps, grpColsSet) = (decompColExps cExps, Set.fromList grpCols)
+       in Set.fromList (getNonAggCols decompExps) == grpColsSet
+            && Set.fromList (getAggCols decompExps) `Set.disjoint` grpColsSet
+            && grpColsSet `Set.isSubsetOf` Set.fromList (getAggCols decompExps)
 
--- >>> (getColNames . decompColExps) [Col "col1", Col "col2"]
+-- >>> (getNonAggCols . decompColExps) [Col "col1", Col "col2"]
 -- ["col1","col2"]
 
--- >>> (getColNames . decompColExps) [Col "col1", Agg Count "col2"]
+-- >>> (getAggCols . decompColExps) [Col "col1", Agg Count "col2"]
+-- ["col2"]
 
 -- Check that there are no aggregate functions when the DISTINCT keyword is used
 distinctHasNoAggFuncs :: SelectExp -> Bool
