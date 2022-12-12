@@ -33,7 +33,10 @@ oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
 convertOrdToBool :: Order -> Bool
 convertOrdToBool o = o == Asc
 
--- lowerAggName f =
+lowerAggName :: String -> String
+lowerAggName f = case f of
+  [] -> []
+  hd : tl -> Char.toLower hd : tl
 
 -- TODO: define instances of the PP typeclass
 -- (eg. PP for binary / unary operators, etc.)
@@ -54,10 +57,10 @@ instance PP Pandas.Func where
   pp Pandas.ResetIndex = PP.text ".reset_index()"
 
 printFn :: Pandas.Func -> String
-printFn (Pandas.SortValues cName o) = ".sort_values(by=[\"" ++ show cName ++ "\"], ascending=" ++ show (convertOrdToBool o) ++ ")"
+printFn (Pandas.SortValues cName o) = ".sort_values(by=[" ++ show cName ++ "], ascending=" ++ show (convertOrdToBool o) ++ ")"
 printFn (Pandas.Rename colNameMap) = undefined
 printFn (Pandas.GroupBy colNames) = ".groupBy(by=" ++ show colNames ++ ")"
-printFn (Pandas.Aggregate fn col) = ".agg({" ++ show col ++ ":" ++ show fn ++ "})"
+printFn (Pandas.Aggregate fn col) = ".agg({" ++ show col ++ ":" ++ show (lowerAggName (show fn)) ++ "})"
 printFn (Pandas.Loc whereExp) = undefined
 printFn (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = ".merge(" ++ show rightDf ++ ", left_on=\"" ++ show leftOn ++ "\", right_on=\"" ++ show rightOn ++ "\", how=\"" ++ show how ++ "\")"
 printFn (Pandas.Unique colNames) = ".drop_duplicates(subset=" ++ show colNames ++ ")"
@@ -66,6 +69,9 @@ printFn Pandas.ResetIndex = ".reset_index()"
 
 instance PP Pandas.MergeExp where
   pp (Pandas.MkMerge rightDf leftOn rightOn how) = PP.text (".merge(" ++ show rightDf ++ ", left_on=\"" ++ show leftOn ++ "\", right_on=\"" ++ show rightOn ++ "\", how=\"" ++ show how ++ "\")")
+
+instance PP WhereExp where
+  pp = undefined
 
 -- TODO: figure out how to print a table
 instance PP Pandas.Block where
@@ -86,8 +92,11 @@ instance PP Pandas.Command where
 -- >>> pp (Command "table" (Just ["col"]) (Just [Head 5]))
 -- table["col"].head(5)
 
--- >>> pp (Pandas.Command "table" (Just ["col1", "col2"]) (Just [Pandas.GroupBy ["col1"], Pandas.ResetIndex, Pandas.Aggregate Count "col2"]))
--- Prelude.undefined
+-- >>> pp (Pandas.Command "table" (Just ["col1", "col2"]) (Just [Pandas.GroupBy ["col1"], Pandas.Aggregate Count "col2", Pandas.ResetIndex]))
+-- table["col1","col2"].groupBy(by=["col1"]).agg({"col2":"count"}).reset_index()
+
+-- >>> pp (Pandas.Command "table" (Just ["col"]) (Just [Pandas.SortValues "col" Asc]))
+-- table["col"].sort_values(by=["col"], ascending=True)
 
 instance PP Row where
   pp = undefined
