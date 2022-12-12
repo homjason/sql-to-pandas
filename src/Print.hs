@@ -62,7 +62,7 @@ printFn (Pandas.Rename colNameMap) = undefined
 printFn (Pandas.GroupBy colNames) = ".groupBy(by=" ++ show colNames ++ ")"
 printFn (Pandas.Aggregate fn col) = ".agg({" ++ show col ++ ":" ++ show (lowerAggName (show fn)) ++ "})"
 printFn (Pandas.Loc whereExp) = undefined
-printFn (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = ".merge(" ++ show rightDf ++ ", left_on=\"" ++ show leftOn ++ "\", right_on=\"" ++ show rightOn ++ "\", how=\"" ++ show how ++ "\")"
+printFn (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = ".merge(" ++ show rightDf ++ ", left_on=" ++ show leftOn ++ ", right_on=" ++ show rightOn ++ ", how=" ++ show how ++ ")"
 printFn (Pandas.Unique colNames) = ".drop_duplicates(subset=" ++ show colNames ++ ")"
 printFn (Pandas.Head n) = ".head(" ++ show n ++ ")"
 printFn Pandas.ResetIndex = ".reset_index()"
