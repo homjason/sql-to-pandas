@@ -1,5 +1,7 @@
 module UnitTests where
 
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Parser
 import Parser qualified as P
 import SQLParser
@@ -304,7 +306,21 @@ test_validateQuery =
               df
               (SQL.GroupBy ["col1"])
           )
+          ~?= False,
+        validateQuery
+          ( mkQuery
+              (Cols [Col "col1", Agg Count "col2"])
+              df
+              (SQL.GroupBy ["col1"])
+          )
           ~?= True,
+        validateQuery
+          ( mkQuery
+              (Cols [Agg Count "col1", Col "col2"])
+              df
+              (SQL.GroupBy ["col1"])
+          )
+          ~?= False,
         validateQuery
           ( mkQuery
               (Cols [Col "col1", Agg Count "col2"])
@@ -323,8 +339,32 @@ test_validateQuery =
   where
     df = Table "df" Nothing
 
--- >>> runTestTT test_validateQuery
--- Counts {cases = 10, tried = 10, errors = 0, failures = 3}
+test_getNonAggCols :: Test
+test_getNonAggCols =
+  "checking that correct non-aggregated cols in SELECT expressions are retrieved"
+    ~: TestList
+      [ (getNonAggCols . decompColExps) [] ~?= [],
+        (getNonAggCols . decompColExps) [Col "col1", Col "col2"]
+          ~?= ["col1", "col2"],
+        (getNonAggCols . decompColExps) [Col "col1", Agg Count "col2"]
+          ~?= ["col1"],
+        (getNonAggCols . decompColExps) [Agg Count "col1"]
+          ~?= []
+      ]
+
+test_getAggCols :: Test
+test_getAggCols =
+  "checking that correct aggregated cols in SELECT expressions are retrieved"
+    ~: TestList
+      [ (getAggCols . decompColExps) [] ~?= [],
+        (getAggCols . decompColExps) [Col "col1"] ~?= [],
+        (getAggCols . decompColExps) [Col "col1", Col "col2"] ~?= [],
+        (getAggCols . decompColExps) [Col "col1", Col "col2"] ~?= [],
+        (getAggCols . decompColExps) [Col "col1", Agg Count "col2"]
+          ~?= ["col2"],
+        (getAggCols . decompColExps) [Agg Avg "col1", Agg Count "col2"]
+          ~?= ["col1", "col2"]
+      ]
 
 test_selectExpIsNonEmpty :: Test
 test_selectExpIsNonEmpty =
@@ -537,4 +577,72 @@ test_groupByToPandasGroupBy =
     ~: TestList
       [ groupByToPandasGroupBy Nothing ~?= [],
         groupByToPandasGroupBy (Just ["col1", "col2"]) ~?= [Pandas.GroupBy ["col1", "col2"]]
+      ]
+
+test_translateSQL :: Test
+test_translateSQL =
+  "translate SQL query to Pandas command"
+    ~: TestList
+      [ translateSQL
+          ( Query
+              { select = Cols [Col "col"],
+                from = Table "table" Nothing,
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= Command
+            { df = "table",
+              cols = Just ["col"],
+              fn = Nothing
+            },
+        translateSQL
+          ( Query
+              { select = Cols [Col "col"],
+                from = Table "table" Nothing,
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Just 5
+              }
+          )
+          ~?= Command
+            { df = "table",
+              cols = Just ["col"],
+              fn = Just [Head 5]
+            },
+        translateSQL
+          ( Query
+              { select = Cols [Col "col1", Agg Count "col2"],
+                from = Table "table" Nothing,
+                wher = Nothing,
+                groupBy = Just ["col1"],
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= Command
+            { df = "table",
+              cols = Just ["col"],
+              fn = Just [Pandas.GroupBy ["col1"], ResetIndex]
+            }
+      ]
+
+test_getFuncs :: Test
+test_getFuncs =
+  "translate SQL functions to Pandas functions"
+    ~: TestList
+      [ getFuncs
+          ( Query
+              { select = Cols [Col "col"],
+                from = Table "table" Nothing,
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= Nothing
       ]

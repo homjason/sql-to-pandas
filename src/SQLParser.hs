@@ -268,8 +268,11 @@ parseWhereExp str = case P.doParse whereTokenP str of
 -- then +/-, then * & /, then unary operators)
 
 -- QUESTION FOR JOE: we need to enclose each literal int in parentheses in order
--- for this function to work, not sure how to fix this
--- OTHER QUESTION: We're having trouble parsing postfix unary operators (IS NULL, IS NOT NULL) --> we were following the LuParser paradigm but it only handles prefix unary operators, not postfix
+-- for whereExpP to work, not sure how to fix this
+-- OTHER QUESTION: We're having trouble parsing postfix unary operators
+-- (eg. IS NULL, IS NOT NULL),
+-- we were following the LuParser paradigm but it only handles prefix
+-- unary operators, not postfix ones
 
 whereExpP :: Parser WhereExp
 whereExpP = compP
@@ -429,12 +432,21 @@ mkQuery2 s f c1 c2 =
 
 -- | Construct a Query based on a SelectExp, FromExp & three conditions
 -- Returns a ParseError if the two conditions are invalid / in the wrong order
-mkQuery3 :: SelectExp -> FromExp -> Condition -> Condition -> Condition -> Either P.ParseError Query
+mkQuery3 ::
+  SelectExp ->
+  FromExp ->
+  Condition ->
+  Condition ->
+  Condition ->
+  Either P.ParseError Query
 mkQuery3 s f c1 c2 c3 =
   case (c1, c2, c3) of
-    (Wher w, GroupBy g, OrderBy o) -> Right $ Query s f (Just w) (Just g) (Just o) Nothing
-    (Wher w, OrderBy o, Limit l) -> Right $ Query s f (Just w) Nothing (Just o) (Just l)
-    (GroupBy g, OrderBy o, Limit l) -> Right $ Query s f Nothing (Just g) (Just o) (Just l)
+    (Wher w, GroupBy g, OrderBy o) ->
+      Right $ Query s f (Just w) (Just g) (Just o) Nothing
+    (Wher w, OrderBy o, Limit l) ->
+      Right $ Query s f (Just w) Nothing (Just o) (Just l)
+    (GroupBy g, OrderBy o, Limit l) ->
+      Right $ Query s f Nothing (Just g) (Just o) (Just l)
     (_, _, _) -> Left "Malformed SQL query, couldn't infer query conditions"
 
 -- | Wrapper function for all the query-parsing business logic
@@ -474,9 +486,12 @@ parseQuery str =
       s <- parseSelectExp select
       f <- parseFromExp from
       case (inferCondition c1, inferCondition c2, inferCondition c3) of
-        (Right w@(Wher _), Right g@(GroupBy _), Right o@(OrderBy _)) -> mkQuery3 s f w g o
-        (Right w@(Wher _), Right o@(OrderBy _), Right l@(Limit _)) -> mkQuery3 s f w o l
-        (Right g@(GroupBy _), Right o@(OrderBy _), Right l@(Limit _)) -> mkQuery3 s f g o l
+        (Right w@(Wher _), Right g@(GroupBy _), Right o@(OrderBy _)) ->
+          mkQuery3 s f w g o
+        (Right w@(Wher _), Right o@(OrderBy _), Right l@(Limit _)) ->
+          mkQuery3 s f w o l
+        (Right g@(GroupBy _), Right o@(OrderBy _), Right l@(Limit _)) ->
+          mkQuery3 s f g o l
         (_, _, _) -> Left "Malformed SQL query"
     [select, from, wher, groupBy, orderBy, limit] -> do
       s <- parseSelectExp select
@@ -496,10 +511,14 @@ splitQueryString = map stripSpace . lines . map toLower
 
 -- Parses a SQL file (takes in filename of the SQL file)
 -- Returns either a ParseError (Left) or a Query (Right)
--- parseSqlFile :: String -> IO (Either P.ParseError Query)
--- parseSqlFile = P.parseFromFile (const <$> parseQuery <*> P.eof)
+-- TODO: fix this function so that it can call parseQuery above
+parseSqlFile :: String -> IO (Either P.ParseError Query)
+parseSqlFile = undefined "P.parseFromFile (const <$> parseQuery <*> P.eof)"
 
--- nullOpP = wsP $ P.string "IS NULL" *> pure isNull
+-- QUESTION FOR JOE: should validateQuery return Either P.ParseError Bool instead?
+-- (so that it can support descriptive error messages)
+-- The issue with making the return type Either is that it might be hard
+-- to use this function as the precondition in a QuickCheck property
 
 -- | Checks if a Query contains valid SQL syntax / is semantically correct
 -- (this function will be used in QuickCheck properties as a precondition)
@@ -532,6 +551,11 @@ groupByColsInSelectExp (Query s _ _ g _ _) =
     -- Check if columns in SELECT expression == columns in GROUP BY
     (Cols cExps, Just grpCols@(_ : _)) ->
       Set.fromList ((getColNames . decompColExps) cExps) == Set.fromList grpCols
+
+-- >>> (getColNames . decompColExps) [Col "col1", Col "col2"]
+-- ["col1","col2"]
+
+-- >>> (getColNames . decompColExps) [Col "col1", Agg Count "col2"]
 
 -- Check that there are no aggregate functions when the DISTINCT keyword is used
 distinctHasNoAggFuncs :: SelectExp -> Bool

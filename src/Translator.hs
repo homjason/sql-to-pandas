@@ -22,18 +22,16 @@ translateSQL q@(Query s f w gb ob l) =
            in Command
                 { df = dfName,
                   cols = Just cols,
-                  fn = Just fns
+                  fn = fns
                 }
 
 -- Given a SQL query, extracts a list of (equivalent) Pandas functions
--- TODO: Add reset_index
-getFuncs :: Query -> [Func]
+getFuncs :: Query -> Maybe [Func]
 getFuncs q@(Query s f w gb ob l) =
-  getJoinFunc (translateFromExp f) ++ whereExpToLoc w
-    ++ groupByToPandasGroupBy gb
-    ++ getFnsFromSelectTranslation (selectExpToCols s)
-    ++ orderByToSortValues ob
-    ++ limitExpToHead l
+  let funcList = getJoinFunc (translateFromExp f) ++ whereExpToLoc w ++ groupByToPandasGroupBy gb ++ getFnsFromSelectTranslation (selectExpToCols s) ++ orderByToSortValues ob ++ limitExpToHead l
+   in case funcList of
+        [] -> Nothing
+        hd : tl -> Just funcList
 
 -- Converts a list of ColExps into list of pairs consisting of colnames & aggregate functions
 decompColExps :: [ColExp] -> [(ColName, Maybe Func)]
@@ -49,15 +47,17 @@ decompColExps = map decompose
 getColNames :: [(ColName, Maybe Func)] -> [ColName]
 getColNames = map fst
 
+-- | Extracts all the non-aggregated columns from a list of deconstructed ColExps
+getNonAggCols :: [(ColName, Maybe Func)] -> [ColName]
+getNonAggCols cExps = [col | (col, Nothing) <- cExps]
+
+-- Extracts all the _aggregated_ columns from a list of deconstructed ColExps
+getAggCols :: [(ColName, Maybe Func)] -> [ColName]
+getAggCols cExps = [col | (col, Just _) <- cExps]
+
 -- | Extracts all the aggregate functions from a list of deconstructed ColExps
 getAggFuncs :: [(ColName, Maybe Func)] -> [Func]
 getAggFuncs = mapMaybe snd
-
--- Old implementation
--- getColNames cExps = [name | x@(Col name) <- cExps]
-
--- >>> getColNames [Col "col1", Col "col2", Agg Count "col1"]
--- ["col1","col2"]
 
 -- Converts "SELECT" expressions in SQL to a list of colnames in Pandas
 -- NB: we either have AggFuncs or Distinct
@@ -134,4 +134,4 @@ getAggs cExps = [x | x@(Agg f cols) <- cExps]
 groupByToPandasGroupBy :: Maybe [ColName] -> [Func]
 groupByToPandasGroupBy cols = case cols of
   Nothing -> []
-  Just cs -> [Pandas.GroupBy cs]
+  Just cs -> [Pandas.GroupBy cs, ResetIndex]
