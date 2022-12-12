@@ -249,44 +249,20 @@ parseWhereExp str = case P.doParse whereTokenP str of
 
 -- | Parse WHERE expressions (binary/unary operators are left associative)
 -- (modified from HW5)
--- We first parse AND/OR oeprators, then comparison operators,
+-- We first parse AND/OR operators, then comparison operators,
 -- then +/-, then * & /, then unary operators)
-
--- QUESTION FOR JOE: we need to enclose each literal int in parentheses in order
--- for whereExpP to work, not sure how to fix this
--- OTHER QUESTION: We're having trouble parsing postfix unary operators
--- (eg. IS NULL, IS NOT NULL),
--- we were following the LuParser paradigm but it only handles prefix
--- unary operators, not postfix ones
-
 whereExpP :: Parser WhereExp
-whereExpP = compP
+whereExpP = sumP
   where
     logicP = compP `P.chainl1` opAtLevel (level (Logic And))
     compP = sumP `P.chainl1` opAtLevel (level (Comp Gt))
     sumP = prodP `P.chainl1` opAtLevel (level (Arith Plus))
     prodP = uopexpP `P.chainl1` opAtLevel (level (Arith Times))
     uopexpP =
-      baseP
-        <|> Op1 <$> uopexpP <*> uopP
+      baseP <|> Op1 <$> uopexpP <*> uopP
     baseP =
       CompVal <$> comparableP
         <|> parens whereExpP
-
--- | Parses string literals
--- (non-quote characters enclosed in-between escaped double quotes)
-litStringP :: Parser String
-litStringP = P.between (P.char '\"') (many $ P.satisfy (/= '\"')) (stringP "\"")
-
--- | Parser for Comparable values
--- TODO: handle LitDouble
-comparableP :: Parser Comparable
-comparableP =
-  P.choice
-    [ ColName <$> nameP,
-      LitInt <$> P.int,
-      LitString <$> litStringP
-    ]
 
 -- | Parse an operator at a specified precedence level (from HW5)
 opAtLevel :: Int -> Parser (WhereExp -> WhereExp -> WhereExp)
@@ -316,6 +292,21 @@ uopP =
   P.choice
     [ constP "is null" IsNull,
       constP "is not null" IsNotNull
+    ]
+
+-- | Parses string literals
+-- (non-quote characters enclosed in-between escaped double quotes)
+litStringP :: Parser String
+litStringP = P.between (P.char '\"') (many $ P.satisfy (/= '\"')) (stringP "\"")
+
+-- | Parser for Comparable values
+-- TODO: handle LitDouble
+comparableP :: Parser Comparable
+comparableP =
+  P.choice
+    [ ColName <$> nameP,
+      LitInt <$> P.int,
+      LitString <$> litStringP
     ]
 
 groupByTokenP :: Parser ()
@@ -492,11 +483,6 @@ splitQueryString = map stripSpace . lines . map toLower
 -- TODO: fix this function so that it can call parseQuery above
 parseSqlFile :: String -> IO (Either P.ParseError Query)
 parseSqlFile = undefined "P.parseFromFile (const <$> parseQuery <*> P.eof)"
-
--- QUESTION FOR JOE: should validateQuery return Either P.ParseError Bool instead?
--- (so that it can support descriptive error messages)
--- The issue with making the return type Either is that it might be hard
--- to use this function as the precondition in a QuickCheck property
 
 -- | Checks if a Query contains valid SQL syntax / is semantically correct
 -- (this function will be used in QuickCheck properties as a precondition)
