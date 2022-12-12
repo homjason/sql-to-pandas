@@ -531,9 +531,6 @@ validateQuery q@(Query s f w gb ob l) = do
   v4 <- noDistinctAndGroupBy s gb
   Right (v1 && v2 && v3 && v4)
 
--- >>> validateQuery $ Query (Cols [Col "col1"]) (Table "df" Nothing) Nothing (Just ["col1"]) Nothing Nothing
--- False
-
 -- Check that we don't have any SELECT / SELECT DISTINCT expressions
 -- without any column names specified
 selectExpIsNonEmpty :: SelectExp -> Either P.ParseError Bool
@@ -541,8 +538,6 @@ selectExpIsNonEmpty (Cols []) = Left "No columns specified in SELECT expression"
 selectExpIsNonEmpty (DistinctCols []) =
   Left "No columns specified in SELECT DISTINCT expression"
 selectExpIsNonEmpty _ = Right True
-
--- TODO: rewrite the last pattern match so that its cleaner
 
 -- | Checks if columns in GROUP BY expressions are in SELECT expressions
 groupByColsInSelectExp :: Query -> Either P.ParseError Bool
@@ -557,20 +552,36 @@ groupByColsInSelectExp (Query s _ _ g _ _) =
     (DistinctCols _, Just (_ : _)) ->
       Left "Can't have SELECT DISTINCT & GROUP BY in the same query"
     -- Check if columns in SELECT expression == columns in GROUP BY
-    (Cols cExps, Just grpCols@(_ : _)) ->
-      let (decompExps, grpColsSet) = (decompColExps cExps, Set.fromList grpCols)
-       in let (aggColSet, nonAggColSet) = (getAggCols decompExps, getNonAggCols decompExps)
-           in if nonAggColSet == grpColsSet
-                && disjoint grpColsSet aggColSet
-                && grpColsSet `isSubsetOf` aggColSet
-                then Right True
-                else Left "Columns in SELECT expression /= columns in GROUP BY"
+    (Cols cExps, Just groupByCols@(_ : _)) ->
+      let decompedExps = decompColExps cExps
+       in if groupByColsAreNotAgg decompedExps groupByCols
+            && groupByColsAggColsDisjoint decompedExps groupByCols
+            && aggColsSubsetOfAllSelectedCols decompedExps groupByCols
+            then Right True
+            else Left "Columns in SELECT expression /= columns in GROUP BY"
 
--- >>> groupByColsInSelectExp (mkQuery (Cols [Col "col1", Col "col2"]) (Table "df" Nothing) (SQL.GroupBy ["col1", "col2"]))
--- Left "Columns in SELECT expression /= columns in GROUP BY"
+-- | Takes in a list of deconstructed ColExps (columns in SELECT expression) &
+-- a list of (GROUP BY) colnames,
+-- and checks that the GROUP BY cols are not aggregated
+groupByColsAreNotAgg :: [(ColName, Maybe Func)] -> [ColName] -> Bool
+groupByColsAreNotAgg decompedExps groupByCols =
+  let nonAggCols = getNonAggCols decompedExps
+   in nonAggCols == Set.fromList groupByCols
 
--- >>> decompColExps [Col "col1", Col "col2"]
--- [("col1",Nothing),("col2",Nothing)]
+-- Checks that the GROUP BY & Aggregated cols in SELECT statement are disjoint
+groupByColsAggColsDisjoint :: [(ColName, Maybe Func)] -> [ColName] -> Bool
+groupByColsAggColsDisjoint decompedExps groupByCols =
+  let aggCols = getAggCols decompedExps
+   in aggCols == Set.fromList groupByCols
+
+-- Checks that the GROUP BY cols are a subset of all cols in SELECT statement
+aggColsSubsetOfAllSelectedCols :: [(ColName, Maybe Func)] -> [ColName] -> Bool
+aggColsSubsetOfAllSelectedCols decompedExps groupByCols =
+  let (aggCols, allCols) =
+        ( getAggCols decompedExps,
+          (Set.fromList . getColNames) decompedExps
+        )
+   in aggCols `isSubsetOf` allCols
 
 -- Check that there are no aggregate functions when the DISTINCT keyword is used
 distinctHasNoAggFuncs :: SelectExp -> Either P.ParseError Bool
@@ -597,3 +608,6 @@ runParseAndTranslate s = case parseQuery s of
       Left validateError -> Left validateError
       Right False -> Left "Invalid SQL query"
       Right True -> Right $ translateSQL q
+
+-- >>> runParseAndTranslate "SELECT col1, COUNT(col2)\nFROM table\nGROUP BY col1"
+-- Right (Command {df = "table", cols = Just ["col1","col2"], fn = Just [GroupBy ["col1"],Aggregate Count "col2",ResetIndex]})
