@@ -38,6 +38,12 @@ lowerAggName f = case f of
   [] -> []
   hd : tl -> Char.toLower hd : tl
 
+mapJoinStyleToPandasSyntax :: JoinStyle -> String
+mapJoinStyleToPandasSyntax js = case js of
+  LeftJoin -> "left"
+  RightJoin -> "right"
+  InnerJoin -> "inner"
+
 -- TODO: define instances of the PP typeclass
 -- (eg. PP for binary / unary operators, etc.)
 instance PP Pandas.Func where
@@ -62,7 +68,7 @@ printFn (Pandas.Rename colNameMap) = undefined
 printFn (Pandas.GroupBy colNames) = ".groupBy(by=" ++ show colNames ++ ")"
 printFn (Pandas.Aggregate fn col) = ".agg({" ++ show col ++ ":" ++ show (lowerAggName (show fn)) ++ "})"
 printFn (Pandas.Loc whereExp) = undefined
-printFn (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = ".merge(" ++ show rightDf ++ ", left_on=" ++ show leftOn ++ ", right_on=" ++ show rightOn ++ ", how=" ++ show how ++ ")"
+printFn (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = ".merge(" ++ rightDf ++ ", left_on=" ++ show leftOn ++ ", right_on=" ++ show rightOn ++ ", how=" ++ show (mapJoinStyleToPandasSyntax how) ++ ")"
 printFn (Pandas.Unique colNames) = ".drop_duplicates(subset=" ++ show colNames ++ ")"
 printFn (Pandas.Head n) = ".head(" ++ show n ++ ")"
 printFn Pandas.ResetIndex = ".reset_index()"

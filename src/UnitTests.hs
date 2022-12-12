@@ -4,7 +4,8 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import Parser
 import Parser qualified as P
-import Print
+-- import Print
+import Print (PP (pp))
 import SQLParser
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
@@ -125,7 +126,7 @@ test_parseQuery =
       [ parseQuery "SELECT col1\nFROM table\nLIMIT 5"
           ~?= Right
             Query
-              { select = Cols [Col "col"],
+              { select = Cols [Col "col1"],
                 from = Table "table" Nothing,
                 wher = Nothing,
                 groupBy = Nothing,
@@ -168,6 +169,16 @@ test_parseQuery =
               { select = Cols [Col "col", Col "col2"],
                 from = Table "table" Nothing,
                 wher = Just $ Op2 (CompVal $ ColName "col") (Comp Gt) (CompVal $ LitInt 4),
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              },
+        parseQuery "SELECT col1, col2\nFROM table1 JOIN table2 ON table1.col1 = table2.col1"
+          ~?= Right
+            Query
+              { select = Cols [Col "col1", Col "col2"],
+                from = Table "table1" (Just $ Join "table1" "col1" "table2" "col1" InnerJoin),
+                wher = Nothing,
                 groupBy = Nothing,
                 orderBy = Nothing,
                 limit = Nothing
@@ -633,7 +644,7 @@ test_translateSQL =
           ~?= Command
             { df = "table",
               cols = Just ["col1", "col2"],
-              fn = Just [Pandas.GroupBy ["col1"], ResetIndex, Aggregate Count "col2"]
+              fn = Just [Pandas.GroupBy ["col1"], Aggregate Count "col2", ResetIndex]
             },
         translateSQL
           ( Query
@@ -664,6 +675,30 @@ test_translateSQL =
             { df = "table",
               cols = Just ["col", "col2"],
               fn = Just [Loc $ Op2 (CompVal $ ColName "col") (Comp Gt) (CompVal $ LitInt 4)]
+            },
+        translateSQL
+          ( Query
+              { select = Cols [Col "col1", Col "col2"],
+                from = Table "table1" (Just $ Join "table1" "col1" "table2" "col1" InnerJoin),
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= Command
+            { df = "table1",
+              cols = Just ["col1", "col2"],
+              fn =
+                Just
+                  [ Merge
+                      MkMerge
+                        { rightDf = "table2",
+                          leftOn = "col1",
+                          rightOn = "col1",
+                          how = InnerJoin
+                        }
+                  ]
             }
       ]
 
@@ -707,5 +742,22 @@ test_printPandasCommands =
       [ pp (Command "table" (Just ["col"]) Nothing) ~?= PP.text "table[\"col\"]",
         pp (Command "table" (Just ["col"]) (Just [Head 5])) ~?= PP.text "table[\"col\"].head(5)",
         pp (Pandas.Command "table" (Just ["col1", "col2"]) (Just [Pandas.GroupBy ["col1"], Pandas.Aggregate Count "col2", Pandas.ResetIndex])) ~?= PP.text "table[\"col1\",\"col2\"].groupBy(by=[\"col1\"]).agg({\"col2\":\"count\"}).reset_index()",
-        pp (Pandas.Command "table" (Just ["col"]) (Just [Pandas.SortValues "col" Asc])) ~?= PP.text "table[\"col\"].sort_values(by=[\"col\"], ascending=True)"
+        pp (Pandas.Command "table" (Just ["col"]) (Just [Pandas.SortValues "col" Asc])) ~?= PP.text "table[\"col\"].sort_values(by=[\"col\"], ascending=True)",
+        pp
+          ( Command
+              { df = "table1",
+                cols = Just ["col1", "col2"],
+                fn =
+                  Just
+                    [ Merge
+                        MkMerge
+                          { rightDf = "table2",
+                            leftOn = "col1",
+                            rightOn = "col1",
+                            how = InnerJoin
+                          }
+                    ]
+              }
+          )
+          ~?= PP.text "table1[\"col1\",\"col2\"].merge(table2, left_on=\"col1\", right_on=\"col1\", how=\"inner\")"
       ]
