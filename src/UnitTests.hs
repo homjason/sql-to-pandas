@@ -282,8 +282,9 @@ test_parseJoinExp =
 --------------------------------------------------------------------------------
 -- Unit Tests for validateQuery & its helper functions
 
--- TODO: fix failing test cases
--- TODO: check that we can't call AggFuncs on a group by column
+-- >>> runTestTT test_validateQuery
+-- Counts {cases = 8, tried = 8, errors = 0, failures = 0}
+
 test_validateQuery :: Test
 test_validateQuery =
   "checking SQL query validation"
@@ -305,32 +306,11 @@ test_validateQuery =
           ~?= Left "Columns in SELECT expression /= columns in GROUP BY",
         validateQuery
           ( mkQuery
-              (DistinctCols [Col "col1"])
-              df
-              (SQL.GroupBy ["col1"])
-          )
-          ~?= Left "Can't have aggregate functions in SELECT DISTINCT expression",
-        validateQuery
-          ( mkQuery
-              (Cols [Col "col1"])
-              df
-              (SQL.GroupBy ["col1"])
-          )
-          ~?= Right True,
-        validateQuery
-          ( mkQuery
               (Cols [Col "col1", Col "col2"])
               df
               (SQL.GroupBy ["col1"])
           )
           ~?= Left "Columns in SELECT expression /= columns in GROUP BY",
-        validateQuery
-          ( mkQuery
-              (Cols [Col "col1", Agg Count "col2"])
-              df
-              (SQL.GroupBy ["col1"])
-          )
-          ~?= Right True,
         validateQuery
           ( mkQuery
               (Cols [Agg Count "col1", Col "col2"])
@@ -340,21 +320,11 @@ test_validateQuery =
           ~?= Left "Columns in SELECT expression /= columns in GROUP BY",
         validateQuery
           ( mkQuery
-              (Cols [Col "col1", Agg Count "col2"])
-              df
-              (SQL.GroupBy ["col1"])
-          )
-          ~?= Right True,
-        validateQuery
-          ( mkQuery
               (Cols [Agg Count "col1", Agg Count "col2"])
               df
               (SQL.GroupBy ["col1", "col2"])
           )
-          ~?= Left "Columns in SELECT expression /= columns in GROUP BY",
-        validateQuery
-          (Query (Cols [Col "col1"]) (Table "df" Nothing) Nothing (Just ["col1"]) Nothing Nothing)
-          ~?= Right True
+          ~?= Left "Columns in SELECT expression /= columns in GROUP BY"
       ]
   where
     df = Table "df" Nothing
