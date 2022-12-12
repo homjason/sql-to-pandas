@@ -2,7 +2,10 @@ module Translator where
 
 import Control.Applicative
 import Data.Char qualified as Char
+import Data.List
 import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Parser (Parser)
 import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
@@ -25,13 +28,21 @@ translateSQL q@(Query s f w gb ob l) =
                   fn = fns
                 }
 
+moveResetIndex :: [Func] -> [Func]
+moveResetIndex fns =
+  if ResetIndex `elem` fns
+    then
+      let newFns = delete ResetIndex fns
+       in newFns ++ [ResetIndex]
+    else fns
+
 -- Given a SQL query, extracts a list of (equivalent) Pandas functions
 getFuncs :: Query -> Maybe [Func]
 getFuncs q@(Query s f w gb ob l) =
   let funcList = getJoinFunc (translateFromExp f) ++ whereExpToLoc w ++ groupByToPandasGroupBy gb ++ getFnsFromSelectTranslation (selectExpToCols s) ++ orderByToSortValues ob ++ limitExpToHead l
    in case funcList of
         [] -> Nothing
-        hd : tl -> Just funcList
+        hd : tl -> Just $ moveResetIndex funcList
 
 -- Converts a list of ColExps into list of pairs consisting of colnames & aggregate functions
 decompColExps :: [ColExp] -> [(ColName, Maybe Func)]
@@ -47,13 +58,13 @@ decompColExps = map decompose
 getColNames :: [(ColName, Maybe Func)] -> [ColName]
 getColNames = map fst
 
--- | Extracts all the non-aggregated columns from a list of deconstructed ColExps
-getNonAggCols :: [(ColName, Maybe Func)] -> [ColName]
-getNonAggCols cExps = [col | (col, Nothing) <- cExps]
+-- | Extracts a set of non-aggregated columns from a list of deconstructed ColExps
+getNonAggCols :: [(ColName, Maybe Func)] -> Set ColName
+getNonAggCols cExps = Set.fromList [col | (col, Nothing) <- cExps]
 
--- Extracts all the _aggregated_ columns from a list of deconstructed ColExps
-getAggCols :: [(ColName, Maybe Func)] -> [ColName]
-getAggCols cExps = [col | (col, Just _) <- cExps]
+-- Extracts a set of _aggregated_ columns from a list of deconstructed ColExps
+getAggCols :: [(ColName, Maybe Func)] -> Set ColName
+getAggCols cExps = Set.fromList [col | (col, Just _) <- cExps]
 
 -- | Extracts all the aggregate functions from a list of deconstructed ColExps
 getAggFuncs :: [(ColName, Maybe Func)] -> [Func]

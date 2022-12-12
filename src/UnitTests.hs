@@ -4,9 +4,11 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import Parser
 import Parser qualified as P
+import Print
 import SQLParser
 import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
+import Text.PrettyPrint qualified as PP
 import Translator
 import Types.PandasTypes as Pandas
 import Types.SQLTypes as SQL
@@ -275,66 +277,73 @@ test_validateQuery :: Test
 test_validateQuery =
   "checking SQL query validation"
     ~: TestList
-      [ validateQuery (mkQuery (Cols []) df (SQL.GroupBy [])) ~?= False,
-        validateQuery (mkQuery (Cols [Col "col1"]) df (SQL.GroupBy [])) ~?= False,
-        validateQuery (mkQuery Star df (SQL.GroupBy ["col1"])) ~?= False,
-        validateQuery (mkQuery Star df (SQL.GroupBy [])) ~?= False,
+      [ validateQuery (mkQuery (Cols []) df (SQL.GroupBy []))
+          ~?= Left "No columns specified in SELECT expression",
+        validateQuery (mkQuery (Cols [Col "col1"]) df (SQL.GroupBy []))
+          ~?= Left "Columns not specified in GROUP BY",
+        validateQuery (mkQuery Star df (SQL.GroupBy ["col1"]))
+          ~?= Left "SELECT * not allowed in queries involving GROUP BY",
+        validateQuery (mkQuery Star df (SQL.GroupBy []))
+          ~?= Left "Columns not specified in GROUP BY",
         validateQuery
           ( mkQuery
               (Cols [Col "col1"])
               df
               (SQL.GroupBy ["col2"])
           )
-          ~?= False,
+          ~?= Left "Columns in SELECT expression /= columns in GROUP BY",
         validateQuery
           ( mkQuery
               (DistinctCols [Col "col1"])
               df
               (SQL.GroupBy ["col1"])
           )
-          ~?= False,
+          ~?= Left "Can't have aggregate functions in SELECT DISTINCT expression",
         validateQuery
           ( mkQuery
               (Cols [Col "col1"])
               df
               (SQL.GroupBy ["col1"])
           )
-          ~?= True,
+          ~?= Right True,
         validateQuery
           ( mkQuery
               (Cols [Col "col1", Col "col2"])
               df
               (SQL.GroupBy ["col1"])
           )
-          ~?= False,
+          ~?= Left "Columns in SELECT expression /= columns in GROUP BY",
         validateQuery
           ( mkQuery
               (Cols [Col "col1", Agg Count "col2"])
               df
               (SQL.GroupBy ["col1"])
           )
-          ~?= True,
+          ~?= Right True,
         validateQuery
           ( mkQuery
               (Cols [Agg Count "col1", Col "col2"])
               df
               (SQL.GroupBy ["col1"])
           )
-          ~?= False,
+          ~?= Left "Columns in SELECT expression /= columns in GROUP BY",
         validateQuery
           ( mkQuery
               (Cols [Col "col1", Agg Count "col2"])
               df
               (SQL.GroupBy ["col1"])
           )
-          ~?= True,
+          ~?= Right True,
         validateQuery
           ( mkQuery
               (Cols [Agg Count "col1", Agg Count "col2"])
               df
               (SQL.GroupBy ["col1", "col2"])
           )
-          ~?= False
+          ~?= Left "Columns in SELECT expression /= columns in GROUP BY",
+        validateQuery
+          (Query (Cols [Col "col1"]) (Table "df" Nothing) Nothing (Just ["col1"]) Nothing Nothing)
+          ~?= Right True
       ]
   where
     df = Table "df" Nothing
@@ -343,40 +352,42 @@ test_getNonAggCols :: Test
 test_getNonAggCols =
   "checking that correct non-aggregated cols in SELECT expressions are retrieved"
     ~: TestList
-      [ (getNonAggCols . decompColExps) [] ~?= [],
-        (getNonAggCols . decompColExps) [Col "col1", Col "col2"]
-          ~?= ["col1", "col2"],
+      [ (getNonAggCols . decompColExps) []
+          ~?= Set.empty,
+        (getNonAggCols . decompColExps)
+          [Col "col1", Col "col2"]
+          ~?= Set.fromList ["col1", "col2"],
         (getNonAggCols . decompColExps) [Col "col1", Agg Count "col2"]
-          ~?= ["col1"],
+          ~?= Set.singleton "col1",
         (getNonAggCols . decompColExps) [Agg Count "col1"]
-          ~?= []
+          ~?= Set.empty
       ]
 
 test_getAggCols :: Test
 test_getAggCols =
   "checking that correct aggregated cols in SELECT expressions are retrieved"
     ~: TestList
-      [ (getAggCols . decompColExps) [] ~?= [],
-        (getAggCols . decompColExps) [Col "col1"] ~?= [],
-        (getAggCols . decompColExps) [Col "col1", Col "col2"] ~?= [],
-        (getAggCols . decompColExps) [Col "col1", Col "col2"] ~?= [],
+      [ (getAggCols . decompColExps) [] ~?= Set.empty,
+        (getAggCols . decompColExps) [Col "col1"] ~?= Set.empty,
+        (getAggCols . decompColExps) [Col "col1", Col "col2"] ~?= Set.empty,
+        (getAggCols . decompColExps) [Col "col1", Col "col2"] ~?= Set.empty,
         (getAggCols . decompColExps) [Col "col1", Agg Count "col2"]
-          ~?= ["col2"],
+          ~?= Set.singleton "col2",
         (getAggCols . decompColExps) [Agg Avg "col1", Agg Count "col2"]
-          ~?= ["col1", "col2"]
+          ~?= Set.fromList ["col1", "col2"]
       ]
 
 test_selectExpIsNonEmpty :: Test
 test_selectExpIsNonEmpty =
   "checking that SELECT expressions are non-empty"
     ~: TestList
-      [ selectExpIsNonEmpty (Cols [Col "col1"]) ~?= True,
-        selectExpIsNonEmpty (Cols [Col "col1", Col "col2"]) ~?= True,
-        selectExpIsNonEmpty (DistinctCols [Col "col1"]) ~?= False,
-        selectExpIsNonEmpty (DistinctCols [Col "col1", Col "Col2"]) ~?= False,
-        selectExpIsNonEmpty (Cols []) ~?= False,
-        selectExpIsNonEmpty (DistinctCols []) ~?= False,
-        selectExpIsNonEmpty Star ~?= True
+      [ selectExpIsNonEmpty Star ~?= Right True,
+        selectExpIsNonEmpty (Cols [Col "col1"]) ~?= Right True,
+        selectExpIsNonEmpty (Cols [Col "col1", Col "col2"]) ~?= Right True,
+        selectExpIsNonEmpty (DistinctCols [Col "col1"]) ~?= Right True,
+        selectExpIsNonEmpty (DistinctCols [Col "col1", Col "Col2"]) ~?= Right True,
+        selectExpIsNonEmpty (Cols []) ~?= Left "No columns specified in SELECT expression",
+        selectExpIsNonEmpty (DistinctCols []) ~?= Left "No columns specified in SELECT DISTINCT expression"
       ]
 
 test_groupByColsInSelectExp :: Test
@@ -384,58 +395,60 @@ test_groupByColsInSelectExp =
   "checking if cols in GROUP BY = cols in SELECT expression"
     ~: TestList
       [ groupByColsInSelectExp (Query Star df Nothing Nothing Nothing Nothing)
-          ~?= False,
-        groupByColsInSelectExp (mkQuery Star df (SQL.GroupBy [])) ~?= False,
-        groupByColsInSelectExp (mkQuery Star df (SQL.GroupBy ["col1", "col2"])) ~?= False,
+          ~?= Right True,
+        groupByColsInSelectExp (mkQuery Star df (SQL.GroupBy []))
+          ~?= Left "Columns not specified in GROUP BY",
+        groupByColsInSelectExp (mkQuery Star df (SQL.GroupBy ["col1", "col2"]))
+          ~?= Left "SELECT * not allowed in queries involving GROUP BY",
         groupByColsInSelectExp
           ( mkQuery
               (DistinctCols [])
               df
               (SQL.GroupBy ["col1", "col2"])
           )
-          ~?= False,
+          ~?= Left "Can't have SELECT DISTINCT & GROUP BY in the same query",
         groupByColsInSelectExp
           ( mkQuery
               (DistinctCols [Col "col1"])
               df
               (SQL.GroupBy ["col1", "col2"])
           )
-          ~?= False,
+          ~?= Left "Can't have SELECT DISTINCT & GROUP BY in the same query",
         groupByColsInSelectExp
           ( mkQuery
               (Cols [Col "col1"])
               df
               (SQL.GroupBy ["col1", "col2"])
           )
-          ~?= False,
+          ~?= Left "Columns in SELECT expression /= columns in GROUP BY",
         groupByColsInSelectExp
           ( mkQuery
               (Cols [Col "col1", Col "col2"])
               df
               (SQL.GroupBy ["col1", "col2"])
           )
-          ~?= True,
+          ~?= Right True,
         groupByColsInSelectExp
           ( mkQuery
               (Cols [Col "col2", Col "col1"])
               df
               (SQL.GroupBy ["col1", "col2"])
           )
-          ~?= True,
+          ~?= Right True,
         groupByColsInSelectExp
           ( mkQuery
               (Cols [Col "col1", Agg Count "col2"])
               df
               (SQL.GroupBy ["col1", "col2"])
           )
-          ~?= True,
+          ~?= Right True,
         groupByColsInSelectExp
           ( mkQuery
               (Cols [Agg Avg "col1", Agg Count "col2"])
               df
               (SQL.GroupBy ["col1", "col2"])
           )
-          ~?= True
+          ~?= Right True
       ]
   where
     df = Table "df" Nothing
@@ -445,28 +458,30 @@ test_distinctHasNoAggFuncs =
   "checking that DISTINCT doesn't coincide w/ aggregate functions"
     ~: TestList
       [ distinctHasNoAggFuncs (DistinctCols [Agg Count "col1"])
-          ~?= False,
+          ~?= Left "Can't have aggregate functions in SELECT DISTINCT expression",
         distinctHasNoAggFuncs (DistinctCols [Col "col1", Agg Count "col2"])
-          ~?= False,
+          ~?= Left "Can't have aggregate functions in SELECT DISTINCT expression",
         distinctHasNoAggFuncs (DistinctCols [Agg Count "col1", Agg Count "col2"])
-          ~?= False,
+          ~?= Left "Can't have aggregate functions in SELECT DISTINCT expression",
         distinctHasNoAggFuncs (DistinctCols [Col "col1", Col "col2"])
-          ~?= True,
+          ~?= Right True,
         distinctHasNoAggFuncs (DistinctCols [])
-          ~?= True,
+          ~?= Right True,
         distinctHasNoAggFuncs (DistinctCols [Col "col1", Col "col2", Col "col3"])
-          ~?= True
+          ~?= Right True
       ]
 
 test_noDistinctAndGroupBy :: Test
 test_noDistinctAndGroupBy =
   "checking that DISTINCTs & GROUP BYs never appear together"
     ~: TestList
-      [ noDistinctAndGroupBy (DistinctCols [Col "col1"]) (Just ["col1"]) ~?= False,
-        noDistinctAndGroupBy (DistinctCols [Col "col1"]) (Just []) ~?= False,
-        noDistinctAndGroupBy (DistinctCols [Col "col1"]) Nothing ~?= True,
-        noDistinctAndGroupBy (Cols [Col "Col1"]) Nothing ~?= True,
-        noDistinctAndGroupBy Star Nothing ~?= True
+      [ noDistinctAndGroupBy (DistinctCols [Col "col1"]) (Just ["col1"])
+          ~?= Left "Can't have DISTINCT & GROUP BY in the same query",
+        noDistinctAndGroupBy (DistinctCols [Col "col1"]) (Just [])
+          ~?= Left "Can't have DISTINCT & GROUP BY in the same query",
+        noDistinctAndGroupBy (DistinctCols [Col "col1"]) Nothing ~?= Right True,
+        noDistinctAndGroupBy (Cols [Col "Col1"]) Nothing ~?= Right True,
+        noDistinctAndGroupBy Star Nothing ~?= Right True
       ]
 
 --------------------------------------------------------------------------------
@@ -667,4 +682,28 @@ test_getFuncs =
               }
           )
           ~?= Nothing
+      ]
+
+-- TODO: add more test cases for runParseAndTranslate (SQLParser.hs)
+test_runParseAndTranslate :: Test
+test_runParseAndTranslate =
+  "Testing wrapper function that takes care of Parsing + Translating"
+    ~: TestList
+      [ runParseAndTranslate "SELECT col1, COUNT(col2)\nFROM table\nGROUP BY col1"
+          ~?= Right
+            ( Command
+                "table"
+                (Just ["col1", "col2"])
+                (Just [Pandas.GroupBy ["col1"], Aggregate Count "col2"])
+            )
+      ]
+
+--------------------------------------------------------------------------------
+-- PRINT unit tests
+test_printPandasCommands :: Test
+test_printPandasCommands =
+  "pretty printing Pandas commands"
+    ~: TestList
+      [ pp (Command "table" (Just ["col"]) Nothing) ~?= PP.text "table[\"col\"]",
+        pp (Command "table" (Just ["col"]) (Just [Head 5])) ~?= PP.text "table[\"col\"].head(5)"
       ]

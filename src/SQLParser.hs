@@ -7,7 +7,7 @@ import Data.Either (rights)
 import Data.Functor (($>))
 import Data.List (dropWhileEnd, foldl')
 import Data.List.Split (splitOn)
-import Data.Set (Set)
+import Data.Set (Set, disjoint, isSubsetOf)
 import Data.Set qualified as Set
 import Parser (Parser)
 import Parser qualified as P
@@ -523,62 +523,68 @@ parseSqlFile = undefined "P.parseFromFile (const <$> parseQuery <*> P.eof)"
 
 -- | Checks if a Query contains valid SQL syntax / is semantically correct
 -- (this function will be used in QuickCheck properties as a precondition)
-validateQuery :: Query -> Bool
-validateQuery q@(Query s f w g o l) =
-  selectExpIsNonEmpty s
-    && groupByColsInSelectExp q
-    && distinctHasNoAggFuncs s
-    && noDistinctAndGroupBy s g
+validateQuery :: Query -> Either P.ParseError Bool
+validateQuery q@(Query s f w gb ob l) = do
+  v1 <- selectExpIsNonEmpty s
+  v2 <- groupByColsInSelectExp q
+  v3 <- distinctHasNoAggFuncs s
+  v4 <- noDistinctAndGroupBy s gb
+  Right (v1 && v2 && v3 && v4)
 
 -- Check that we don't have any SELECT / SELECT DISTINCT expressions
 -- without any column names specified
-selectExpIsNonEmpty :: SelectExp -> Bool
-selectExpIsNonEmpty (Cols []) = False
-selectExpIsNonEmpty (DistinctCols []) = False
-selectExpIsNonEmpty _ = True
+selectExpIsNonEmpty :: SelectExp -> Either P.ParseError Bool
+selectExpIsNonEmpty (Cols []) = Left "No columns specified in SELECT expression"
+selectExpIsNonEmpty (DistinctCols []) =
+  Left "No columns specified in SELECT DISTINCT expression"
+selectExpIsNonEmpty _ = Right True
+
+-- TODO: rewrite the last pattern match so that its cleaner
 
 -- | Checks if columns in GROUP BY expressions are in SELECT expressions
-groupByColsInSelectExp :: Query -> Bool
+groupByColsInSelectExp :: Query -> Either P.ParseError Bool
 groupByColsInSelectExp (Query s _ _ g _ _) =
   case (s, g) of
-    -- Empty GROUP BY expressions are invalid
-    (_, Nothing) -> False
-    -- GROUP BY expression is malformed (columns not specified)
-    (_, Just []) -> False
-    -- We explcitly disallow the use of SELECT * in queries involving GROUP BYs
-    (Star, Just (_ : _)) -> False
-    -- DISTINCT & GROUP BY not allowed to coexist
-    (DistinctCols _, Just (_ : _)) -> False
+    -- GROUP BY contains no columns, all grouped cols are vacuously in SelectExp
+    (_, Nothing) -> Right True
+    (_, Just []) ->
+      Left "Columns not specified in GROUP BY"
+    (Star, Just (_ : _)) ->
+      Left "SELECT * not allowed in queries involving GROUP BY"
+    (DistinctCols _, Just (_ : _)) ->
+      Left "Can't have SELECT DISTINCT & GROUP BY in the same query"
     -- Check if columns in SELECT expression == columns in GROUP BY
     (Cols cExps, Just grpCols@(_ : _)) ->
       let (decompExps, grpColsSet) = (decompColExps cExps, Set.fromList grpCols)
-       in Set.fromList (getNonAggCols decompExps) == grpColsSet
-            && Set.fromList (getAggCols decompExps) `Set.disjoint` grpColsSet
-            && grpColsSet `Set.isSubsetOf` Set.fromList (getAggCols decompExps)
-
--- >>> (getNonAggCols . decompColExps) [Col "col1", Col "col2"]
--- ["col1","col2"]
-
--- >>> (getAggCols . decompColExps) [Col "col1", Agg Count "col2"]
--- ["col2"]
+       in let (aggColSet, nonAggColSet) = (getAggCols decompExps, getNonAggCols decompExps)
+           in if nonAggColSet == grpColsSet
+                && disjoint grpColsSet aggColSet
+                && grpColsSet `isSubsetOf` aggColSet
+                then Right True
+                else Left "Columns in SELECT expression /= columns in GROUP BY"
 
 -- Check that there are no aggregate functions when the DISTINCT keyword is used
-distinctHasNoAggFuncs :: SelectExp -> Bool
-distinctHasNoAggFuncs (DistinctCols []) = True
+distinctHasNoAggFuncs :: SelectExp -> Either P.ParseError Bool
+distinctHasNoAggFuncs (DistinctCols []) = Right True
 distinctHasNoAggFuncs (DistinctCols (c : cs)) =
   case c of
     Col _ -> distinctHasNoAggFuncs (DistinctCols cs)
-    Agg _ _ -> False
-distinctHasNoAggFuncs _ = True
+    Agg _ _ -> Left "Can't have aggregate functions in SELECT DISTINCT expression"
+distinctHasNoAggFuncs _ = Right True
 
 -- Check that we can't have DISTINCT & GROUP BYs together in the same query
-noDistinctAndGroupBy :: SelectExp -> Maybe [ColName] -> Bool
-noDistinctAndGroupBy select@(DistinctCols _) groupBy@(Just _) = False
-noDistinctAndGroupBy _ (Just _) = True
-noDistinctAndGroupBy _ Nothing = True
+noDistinctAndGroupBy :: SelectExp -> Maybe [ColName] -> Either P.ParseError Bool
+noDistinctAndGroupBy select@(DistinctCols _) groupBy@(Just _) =
+  Left "Can't have DISTINCT & GROUP BY in the same query"
+noDistinctAndGroupBy _ (Just _) = Right True
+noDistinctAndGroupBy _ Nothing = Right True
 
 -- Parses the string into a query and translates it into a Pandas Command
 runParseAndTranslate :: String -> Either P.ParseError Command
 runParseAndTranslate s = case parseQuery s of
   Left str -> Left str
-  Right q -> if validateQuery q then Right $ translateSQL q else Left "Invalid Query"
+  Right q ->
+    case validateQuery q of
+      Left validateError -> Left validateError
+      Right False -> Left "Invalid SQL query"
+      Right True -> Right $ translateSQL q
