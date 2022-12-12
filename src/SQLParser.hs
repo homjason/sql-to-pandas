@@ -13,8 +13,8 @@ import Parser (Parser)
 import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
-import Translator (decompColExps, getAggCols, getAggFuncs, getColNames, getNonAggCols, translateSQL) -- TEMPORARY
-import Types.PandasTypes as Pandas -- TEMPORARY
+import Translator (decompColExps, getAggCols, getAggFuncs, getColNames, getNonAggCols, translateSQL)
+import Types.PandasTypes as Pandas
 import Types.SQLTypes as SQL
 import Types.TableTypes
 import Types.Types
@@ -109,13 +109,6 @@ strToDouble = read :: String -> Double
 
 numberP :: Parser String
 numberP = P.choice [some P.digit, P.char '+' *> some P.digit, (:) <$> P.char '-' <*> some P.digit]
-
--- doubleValP :: Parser Comparable
--- doubleValP = LitDouble <$>
--- strToDouble <$> (++) <$> some P.digit <*> (optionP "" $ (:) <$> P.char '.' <*> some P.digit)
-
--- optionP :: String -> Parser String -> Parser String
--- optionP default p = p <|> return default
 
 number :: Parser String
 number = some P.digit
@@ -248,15 +241,6 @@ parseJoinExp str = do
 whereTokenP :: Parser ()
 whereTokenP = stringP "where"
 
-compOpP :: Parser CompOp
-compOpP = constP "=" Eq <|> constP ">" Gt <|> constP ">=" Ge <|> constP "<" Lt <|> constP "<=" Le
-
-arithOpP :: Parser ArithOp
-arithOpP = constP "+" Plus <|> constP "-" Minus <|> constP "*" Times <|> constP "/" Divide <|> constP "%" Modulo
-
-logicOpP :: Parser LogicOp
-logicOpP = constP "and" And <|> constP "or" Or
-
 -- Parses Where expressions
 parseWhereExp :: String -> Either P.ParseError WhereExp
 parseWhereExp str = case P.doParse whereTokenP str of
@@ -380,13 +364,6 @@ limitP = stringP "limit" *> P.int
 -- Parses the "Limit" token & the subsequent integer
 parseLimitExp :: String -> Either P.ParseError Int
 parseLimitExp = P.parse limitP
-
--- Parsers for various operations
-renameOpP :: Parser RenameOp
-renameOpP = undefined
-
-aggFuncOp :: Parser AggFunc
-aggFuncOp = undefined
 
 -- TODO: In the function inferCondition, use alternative instead of nested cases
 -- (change return type of ParseGroupByExp, parseOrderByExp etc. to
