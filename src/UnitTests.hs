@@ -60,7 +60,7 @@ test_parseSelectExp =
       ]
 
 -- >>> runTestTT test_parseSelectExp
--- Counts {cases = 5, tried = 5, errors = 0, failures = 1}
+-- Counts {cases = 5, tried = 5, errors = 0, failures = 0}
 
 -- TODO: fix failing test cases
 test_parseWhereExp :: Test
@@ -68,13 +68,130 @@ test_parseWhereExp =
   "parsing WHERE expressions"
     ~: TestList
       [ parseWhereExp "where 1 + 2"
-          ~?= Right (Op2 (CompVal (LitInt 1)) (Arith Plus) (CompVal (LitInt 2))),
+          ~?= Right
+            ( Op2
+                (CompVal (LitInt 1))
+                (Arith Plus)
+                (CompVal (LitInt 2))
+            ),
         parseWhereExp "where (1) + (2)"
-          ~?= Right (Op2 (CompVal (LitInt 1)) (Arith Plus) (CompVal (LitInt 2))),
+          ~?= Right
+            ( Op2
+                (CompVal (LitInt 1))
+                (Arith Plus)
+                (CompVal (LitInt 2))
+            ),
+        parseWhereExp "where col > 0"
+          ~?= Right
+            ( Op2
+                (CompVal (ColName "col"))
+                (Comp Gt)
+                (CompVal (LitInt 0))
+            ),
+        parseWhereExp "where col <= 1"
+          ~?= Right
+            ( Op2
+                (CompVal (ColName "col"))
+                (Comp Le)
+                (CompVal (LitInt 1))
+            ),
         parseWhereExp "where col = \"hello\""
-          ~?= Right (Op2 (CompVal (ColName "col")) (Comp Eq) (CompVal (LitString "hello"))),
+          ~?= Right
+            ( Op2
+                (CompVal (ColName "col"))
+                (Comp Eq)
+                (CompVal (LitString "hello"))
+            ),
+        parseWhereExp "where col != \"invalid\""
+          ~?= Right
+            ( Op2
+                (CompVal (ColName "col"))
+                (Comp Neq)
+                (CompVal (LitString "invalid"))
+            ),
+        parseWhereExp "where col = 5"
+          ~?= Right
+            ( Op2
+                (CompVal (ColName "col"))
+                (Comp Eq)
+                (CompVal (LitInt 5))
+            ),
+        parseWhereExp "where col != 0"
+          ~?= Right
+            ( Op2
+                (CompVal (ColName "col"))
+                (Comp Neq)
+                (CompVal (LitInt 0))
+            ),
+        parseWhereExp "where col1 != col2"
+          ~?= Right
+            ( Op2
+                (CompVal (ColName "col1"))
+                (Comp Neq)
+                (CompVal (ColName "col2"))
+            ),
         parseWhereExp "where col is null"
-          ~?= Right (Op1 (CompVal (ColName "col")) IsNull)
+          ~?= Right (Op1 (CompVal (ColName "col")) IsNull),
+        parseWhereExp "where col is not null"
+          ~?= Right (Op1 (CompVal (ColName "col")) IsNotNull),
+        parseWhereExp "where col              is null"
+          ~?= Right (Op1 (CompVal (ColName "col")) IsNull),
+        parseWhereExp "where col > 5"
+          ~?= Right
+            ( Op2
+                (CompVal (ColName "col"))
+                (Comp Ge)
+                (CompVal (LitInt 5))
+            ),
+        parseWhereExp "where col                <= 5"
+          ~?= Right
+            ( Op2
+                (CompVal (ColName "col"))
+                (Comp Lt)
+                (CompVal (LitInt 5))
+            ),
+        parseWhereExp "where col + 1 = 2"
+          ~?= Right
+            ( Op2
+                (Op2 (CompVal (ColName "col")) (Arith Plus) (CompVal (LitInt 1)))
+                (Comp Eq)
+                (CompVal (LitInt 1))
+            ),
+        parseWhereExp "where (col1 is null) and (col2 is not null)"
+          ~?= Right
+            ( Op2
+                (Op1 (CompVal (ColName "col1")) IsNull)
+                (Logic And)
+                (Op1 (CompVal (ColName "col2")) IsNotNull)
+            ),
+        parseWhereExp "where (col1 is null) or (col2 >= 0)"
+          ~?= Right
+            ( Op2
+                (Op1 (CompVal (ColName "col1")) IsNull)
+                (Logic Or)
+                (Op2 (CompVal (ColName "col2")) (Comp Ge) (CompVal (LitInt 0)))
+            ),
+        parseWhereExp "where (col1 / col2) and (col2 != 0)"
+          ~?= Right
+            ( Op2
+                (Op2 (CompVal (ColName "col1")) (Arith Divide) (CompVal (ColName "col2")))
+                (Logic And)
+                (Op2 (CompVal (ColName "col2")) (Comp Neq) (CompVal (LitInt 0)))
+            ),
+        parseWhereExp "where col1 + col2 > 3"
+          ~?= Right
+            ( Op2
+                (Op2 (CompVal (ColName "col1")) (Arith Plus) (CompVal (ColName "col2")))
+                (Comp Gt)
+                (CompVal (LitInt 3))
+            ),
+        parseWhereExp "where col1 - col2 = col3 - col4"
+          ~?= Right
+            ( Op2
+                (Op2 (CompVal (ColName "col1")) (Arith Minus) (CompVal (ColName "col2")))
+                (Comp Eq)
+                (Op2 (CompVal (ColName "col3")) (Arith Minus) (CompVal (ColName "col4")))
+            )
       ]
 
 -- GROUP BY Expression Tests

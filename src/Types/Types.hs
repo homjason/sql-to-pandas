@@ -11,7 +11,7 @@ type TableName = String
 
 type ColName = String
 
--- Order in which to sort query results (ascending or descending)
+-- Order in which to sort rows in the query result (ascending or descending)
 data Order = Asc | Desc
   deriving (Show, Eq, Enum, Bounded)
 
@@ -32,11 +32,11 @@ data Comparable
   | LitDouble Double -- literal doubles
   deriving (Eq, Show)
 
--- Datatype representing binary operators
+-- Datatype representing different families of (infix) binary operators
 data Bop = Comp CompOp | Arith ArithOp | Logic LogicOp
   deriving (Eq, Show)
 
--- Unary operators
+-- Postfix unary operators for checking if a column is null / not-null
 data Uop = IsNull | IsNotNull
   deriving (Eq, Show, Bounded, Enum)
 
@@ -53,13 +53,14 @@ level (Arith Times) = 7
 level (Arith Divide) = 7
 level (Arith Modulo) = 7
 
--- Comparison (binary) operations that return a Boolean
+-- (Infix) binary operators used for comparisons
 data CompOp
-  = Eq -- `=` :: Comparable -> Comparable -> Bool
-  | Gt -- `>`  :: Comparable -> Comparable -> Bool
-  | Ge -- `>=` :: Comparable -> Comparable -> Bool
-  | Lt -- `<`  :: Comparable -> Comparable -> Bool
-  | Le -- `<=` :: Comparable -> Comparable -> Bool
+  = Eq -- `=`
+  | Neq -- `!=`
+  | Gt -- `>`
+  | Ge -- `>=`
+  | Lt -- `<`
+  | Le -- `<=`
   deriving (Eq, Show, Enum, Bounded)
 
 -- Arithmetic (binary) operations
@@ -76,13 +77,6 @@ data LogicOp
   = And
   | Or
   deriving (Eq, Show, Enum, Bounded)
-
--- Unary operations for checking if a column is null / not-null
--- akin to isna() & notna() in Pandas
--- data NullOp
---  = IsNull -- Check whether a column contains null values
---  | IsNotNull -- Check whether a column contains non-null values
---  deriving (Eq, Show, Enum, Bounded)
 
 -- Aggregate Functions to be used with a GroupBy
 data AggFunc
