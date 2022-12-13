@@ -68,6 +68,17 @@ instance Alternative Parser where
   (<|>) :: Parser a -> Parser a -> Parser a
   p1 <|> p2 = P $ \s -> doParse p1 s `firstJust` doParse p2 s
 
+-- We make Parser a Monad instance so that we can use bind
+instance Monad Parser where
+  return :: a -> Parser a
+  return = pure
+
+  -- Definition of bind inspired by Module 10 lecture solutions
+  (>>=) :: Parser a -> (a -> Parser b) -> Parser b
+  p >>= k = P $ \s -> do
+    (a, s') <- doParse p s
+    doParse (k a) s'
+
 -- | Combine two Maybe values together, producing the first
 -- successful result
 firstJust :: Maybe a -> Maybe a -> Maybe a

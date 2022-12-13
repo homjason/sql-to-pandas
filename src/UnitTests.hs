@@ -461,20 +461,20 @@ test_parseFromExp =
                         style = LeftJoin
                       }
                 )
+            ),
+        parseFromExp "from (select col from B)"
+          ~?= Right
+            ( SubQuery
+                Query
+                  { select = Cols [Col "col"],
+                    from = Table "B" Nothing,
+                    wher = Nothing,
+                    groupBy = Nothing,
+                    limit = Nothing,
+                    orderBy = Nothing
+                  }
+                Nothing
             )
-            -- parseFromExp "from (select col from B)"
-            --   ~?= Right
-            --     ( SubQuery
-            --         Query
-            --           { select = Cols [Col "col"],
-            --             from = Table "B" Nothing,
-            --             wher = Nothing,
-            --             groupBy = Nothing,
-            --             limit = Nothing,
-            --             orderBy = Nothing
-            --           }
-            --         Nothing
-            --     )
       ]
 
 test_parseJoinExp :: Test
@@ -482,11 +482,35 @@ test_parseJoinExp =
   "parsing join expressions"
     ~: TestList
       [ parseJoinExp "a join b on a.col = b.col"
-          ~?= Right (Join {leftTable = "a", leftCol = "col", rightTable = "b", rightCol = "col", style = InnerJoin}),
+          ~?= Right
+            ( Join
+                { leftTable = "a",
+                  leftCol = "col",
+                  rightTable = "b",
+                  rightCol = "col",
+                  style = InnerJoin
+                }
+            ),
         parseJoinExp "a left join b on a.col = b.col"
-          ~?= Right (Join {leftTable = "a", leftCol = "col", rightTable = "b", rightCol = "col", style = LeftJoin}),
+          ~?= Right
+            ( Join
+                { leftTable = "a",
+                  leftCol = "col",
+                  rightTable = "b",
+                  rightCol = "col",
+                  style = LeftJoin
+                }
+            ),
         parseJoinExp "a right join b on a.col = b.col"
-          ~?= Right (Join {leftTable = "a", leftCol = "col", rightTable = "b", rightCol = "col", style = RightJoin}),
+          ~?= Right
+            ( Join
+                { leftTable = "a",
+                  leftCol = "col",
+                  rightTable = "b",
+                  rightCol = "col",
+                  style = RightJoin
+                }
+            ),
         parseJoinExp "a left join b"
           ~?= Left "No join condition specified",
         parseJoinExp "a join b on c.col = d.col"

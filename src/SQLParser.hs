@@ -198,15 +198,18 @@ joinTokenP =
 -- | Parses FROM expressions
 -- TODO: handle subqueries!
 parseFromExp :: String -> Either P.ParseError FromExp
-parseFromExp str = case P.doParse fromTokenP str of
-  Nothing -> Left "Error: No parses, malformed FROM expression"
-  Just ((), remainder) ->
-    case words remainder of
-      [] -> Left "Error: No table selected in FROM expression"
-      [tableName] -> Right $ Table tableName Nothing
-      _ -> case parseJoinExp remainder of
-        Right joinExp@(Join leftT _ _ _ _) -> Right $ Table leftT (Just joinExp)
-        Left errorMsg -> Left errorMsg
+parseFromExp str =
+  case P.doParse fromTokenP str of
+    Nothing -> Left "Error: No parses, malformed FROM expression"
+    Just ((), remainder) ->
+      -- Split the remainder of the query string & identify JOIN expressions
+      case words remainder of
+        [] -> Left "Error: No table selected in FROM expression"
+        [tableName] -> Right $ Table tableName Nothing
+        _ ->
+          case parseJoinExp remainder of
+            Right joinExp@(Join leftT _ _ _ _) -> Right $ Table leftT (Just joinExp)
+            Left errorMsg -> Left errorMsg
 
 -- | Parses JOIN expressions
 -- (resolves the two tables & columns partaking in the join)
