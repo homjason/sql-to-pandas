@@ -252,7 +252,7 @@ parseWhereExp str = case P.doParse whereTokenP str of
 -- We first parse AND/OR operators, then comparison operators,
 -- then + & -, then * & /, then (postfix) unary operators
 whereExpP :: Parser WhereExp
-whereExpP = sumP
+whereExpP = logicP
   where
     logicP = compP `P.chainl1` opAtLevel (level (Logic And))
     compP = sumP `P.chainl1` opAtLevel (level (Comp Gt))
@@ -276,6 +276,7 @@ bopP =
     bop =
       P.choice
         [ constP "=" (Comp Eq),
+          constP "!=" (Comp Neq),
           constP ">" (Comp Gt),
           constP ">=" (Comp Ge),
           constP "<" (Comp Lt),
@@ -425,8 +426,8 @@ mkQuery3 s f c1 c2 c3 =
 -- s = SELECT expression
 -- f = FROM expression
 -- w = WHERE expression
--- g = GROUP BY expression
--- o = ORDER BY expression
+-- gb = GROUP BY expression
+-- ob = ORDER BY expression
 -- l = LIMIT expression
 -- c = Arbitrary SQL query condition (WHERE/GROUP BY/ORDER BY/LIMIT)
 parseQuery :: String -> Either P.ParseError Query
@@ -574,6 +575,3 @@ runParseAndTranslate s = case parseQuery s of
       Left validateError -> Left validateError
       Right False -> Left "Invalid SQL query"
       Right True -> Right $ translateSQL q
-
--- >>> runParseAndTranslate "SELECT col1, COUNT(col2)\nFROM table\nGROUP BY col1"
--- Right (Command {df = "table", cols = Just ["col1","col2"], fn = Just [GroupBy ["col1"],Aggregate Count "col2",ResetIndex]})

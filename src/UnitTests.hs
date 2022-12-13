@@ -81,6 +81,34 @@ test_parseWhereExp =
                 (Arith Plus)
                 (CompVal (LitInt 2))
             ),
+        parseWhereExp "where 1 * 2"
+          ~?= Right
+            ( Op2
+                (CompVal (LitInt 1))
+                (Arith Times)
+                (CompVal (LitInt 2))
+            ),
+        parseWhereExp "where 4 / 2"
+          ~?= Right
+            ( Op2
+                (CompVal (LitInt 4))
+                (Arith Divide)
+                (CompVal (LitInt 2))
+            ),
+        parseWhereExp "where 3 - 2"
+          ~?= Right
+            ( Op2
+                (CompVal (LitInt 3))
+                (Arith Minus)
+                (CompVal (LitInt 2))
+            ),
+        parseWhereExp "where 1 < 2"
+          ~?= Right
+            ( Op2
+                (CompVal (LitInt 1))
+                (Comp Lt)
+                (CompVal (LitInt 2))
+            ),
         parseWhereExp "where col > 0"
           ~?= Right
             ( Op2
