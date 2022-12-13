@@ -258,7 +258,9 @@ whereExpP = logicP
     compP = sumP `P.chainl1` opAtLevel (level (Comp Gt))
     sumP = prodP `P.chainl1` opAtLevel (level (Arith Plus))
     prodP = uopexpP `P.chainl1` opAtLevel (level (Arith Times))
-    uopexpP = (Op1 <$> baseP <*> uopP) <|> baseP
+    uopexpP =
+      (Op1 <$> baseP <*> uopP)
+        <|> baseP
     baseP =
       CompVal <$> comparableP
         <|> parens whereExpP
@@ -267,7 +269,7 @@ whereExpP = logicP
 opAtLevel :: Int -> Parser (WhereExp -> WhereExp -> WhereExp)
 opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
 
--- | Parses binary operators
+-- | Parses (infix) binary operators
 bopP :: Parser Bop
 bopP =
   P.between whitespace bop whitespace
@@ -277,10 +279,10 @@ bopP =
       P.choice
         [ constP "=" (Comp Eq),
           constP "!=" (Comp Neq),
-          constP ">" (Comp Gt),
           constP ">=" (Comp Ge),
-          constP "<" (Comp Lt),
+          constP ">" (Comp Gt),
           constP "<=" (Comp Le),
+          constP "<" (Comp Lt),
           constP "+" (Arith Plus),
           constP "-" (Arith Minus),
           constP "*" (Arith Times),
@@ -290,7 +292,7 @@ bopP =
           constP "or" (Logic Or)
         ]
 
--- | Parses unary operators
+-- | Parses (postfix) unary operators
 uopP :: Parser Uop
 uopP =
   P.choice

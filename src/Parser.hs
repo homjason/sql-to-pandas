@@ -155,7 +155,9 @@ int = read <$> ((++) <$> string "-" <*> some digit <|> some digit)
 chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
 p `chainl1` pop = foldl comb <$> p <*> rest
   where
+    -- comb :: t -> (t -> t1 -> t2, t1) -> t2
     comb x (op, y) = x `op` y
+    -- rest :: [(a -> a -> a, a)]
     rest = many ((,) <$> pop <*> p)
 
 -- | @chainl p pop x@ parses zero or more occurrences of @p@, separated by @pop@.

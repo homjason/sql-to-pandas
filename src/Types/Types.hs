@@ -32,13 +32,13 @@ data Comparable
   | LitDouble Double -- literal doubles
   deriving (Eq, Show)
 
--- Datatype representing different families of (infix) binary operators
-data Bop = Comp CompOp | Arith ArithOp | Logic LogicOp
-  deriving (Eq, Show)
-
 -- Postfix unary operators for checking if a column is null / not-null
 data Uop = IsNull | IsNotNull
   deriving (Eq, Show, Bounded, Enum)
+
+-- Datatype representing different families of (infix) binary operators
+data Bop = Comp CompOp | Arith ArithOp | Logic LogicOp
+  deriving (Eq, Show)
 
 -- Binary operator precedence (similar to Haskell's operator precedence)
 -- https://rosettacode.org/wiki/Operator_precedence

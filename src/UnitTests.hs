@@ -88,6 +88,20 @@ test_parseWhereExp =
                 (Arith Times)
                 (CompVal (LitInt 2))
             ),
+        parseWhereExp "where 1*2"
+          ~?= Right
+            ( Op2
+                (CompVal (LitInt 1))
+                (Arith Times)
+                (CompVal (LitInt 2))
+            ),
+        parseWhereExp "where     2          *   3"
+          ~?= Right
+            ( Op2
+                (CompVal (LitInt 2))
+                (Arith Times)
+                (CompVal (LitInt 3))
+            ),
         parseWhereExp "where 4 / 2"
           ~?= Right
             ( Op2
@@ -116,11 +130,11 @@ test_parseWhereExp =
                 (Comp Gt)
                 (CompVal (LitInt 0))
             ),
-        parseWhereExp "where col <= 1"
+        parseWhereExp "where col < 1"
           ~?= Right
             ( Op2
                 (CompVal (ColName "col"))
-                (Comp Le)
+                (Comp Lt)
                 (CompVal (LitInt 1))
             ),
         parseWhereExp "where col = \"hello\""
@@ -168,14 +182,14 @@ test_parseWhereExp =
           ~?= Right
             ( Op2
                 (CompVal (ColName "col"))
-                (Comp Ge)
+                (Comp Gt)
                 (CompVal (LitInt 5))
             ),
         parseWhereExp "where col                <= 5"
           ~?= Right
             ( Op2
                 (CompVal (ColName "col"))
-                (Comp Lt)
+                (Comp Le)
                 (CompVal (LitInt 5))
             ),
         parseWhereExp "where col + 1 = 2"
@@ -183,7 +197,7 @@ test_parseWhereExp =
             ( Op2
                 (Op2 (CompVal (ColName "col")) (Arith Plus) (CompVal (LitInt 1)))
                 (Comp Eq)
-                (CompVal (LitInt 1))
+                (CompVal (LitInt 2))
             ),
         parseWhereExp "where (col1 is null) and (col2 is not null)"
           ~?= Right
