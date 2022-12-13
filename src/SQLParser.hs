@@ -258,8 +258,7 @@ whereExpP = sumP
     compP = sumP `P.chainl1` opAtLevel (level (Comp Gt))
     sumP = prodP `P.chainl1` opAtLevel (level (Arith Plus))
     prodP = uopexpP `P.chainl1` opAtLevel (level (Arith Times))
-    uopexpP =
-      baseP <|> Op1 <$> uopexpP <*> uopP
+    uopexpP = (Op1 <$> baseP <*> uopP) <|> baseP
     baseP =
       CompVal <$> comparableP
         <|> parens whereExpP
