@@ -233,6 +233,86 @@ test_parseWhereExp =
                 (Op2 (CompVal (ColName "col1")) (Arith Minus) (CompVal (ColName "col2")))
                 (Comp Eq)
                 (Op2 (CompVal (ColName "col3")) (Arith Minus) (CompVal (ColName "col4")))
+            ),
+        parseWhereExp "where type = \"savings\" and balance < 100"
+          ~?= Right
+            ( Op2
+                (Op2 (CompVal (ColName "type")) (Comp Eq) (CompVal (LitString "savings")))
+                (Logic And)
+                (Op2 (CompVal (ColName "balance")) (Comp Lt) (CompVal (LitInt 100)))
+            ),
+        parseWhereExp "where C.balance > 1000 and D.amount > 100"
+          ~?= Right
+            ( Op2
+                ( Op2
+                    (CompVal (ColName "C.balance"))
+                    (Comp Gt)
+                    (CompVal (LitInt 1000))
+                )
+                (Logic And)
+                ( Op2
+                    (CompVal (ColName "D.amount"))
+                    (Comp Gt)
+                    (CompVal (LitInt 100))
+                )
+            ),
+        -- Check that arithmetic operations are
+        -- parsed in a left associative manner
+        parseWhereExp "where 10 * 2 + 1"
+          ~?= Right
+            ( Op2
+                ( Op2
+                    (CompVal (LitInt 10))
+                    (Arith Times)
+                    (CompVal (LitInt 2))
+                )
+                (Arith Plus)
+                (CompVal (LitInt 1))
+            ),
+        -- Check that parens in arithmetic operations
+        -- are parsed correctly
+        parseWhereExp "where 10 * (2 + 1)"
+          ~?= Right
+            ( Op2
+                (CompVal (LitInt 10))
+                (Arith Times)
+                ( Op2
+                    (CompVal (LitInt 2))
+                    (Arith Plus)
+                    (CompVal (LitInt 1))
+                )
+            ),
+        -- Should be parsed as "(1 + (10 * 2)) + 100"
+        parseWhereExp "where 1 + 10 * 2 + 100"
+          ~?= Right
+            ( Op2
+                ( Op2
+                    (CompVal (LitInt 1))
+                    (Arith Plus)
+                    ( Op2
+                        (CompVal (LitInt 10))
+                        (Arith Times)
+                        (CompVal (LitInt 2))
+                    )
+                )
+                (Arith Plus)
+                (CompVal (LitInt 100))
+            ),
+        -- Should be parsed as "1 + ((10 * 2) + 100)"
+        parseWhereExp "where 1 + (10 * 2 + 100)"
+          ~?= Right
+            ( Op2
+                (CompVal (LitInt 1))
+                (Arith Plus)
+                ( Op2
+                    ( Op2
+                        (CompVal (LitInt 10))
+                        (Arith Times)
+                        (CompVal (LitInt 2))
+                    )
+                    (Arith Plus)
+                    (CompVal (LitInt 100))
+                )
             )
       ]
 
@@ -347,7 +427,7 @@ test_parseQuery =
 -- >>> runTestTT test_parseQuery
 
 -- >>> runTestTT test_parseFromExp
--- Counts {cases = 3, tried = 3, errors = 0, failures = 2}
+-- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
 
 test_parseFromExp :: Test
 test_parseFromExp =
