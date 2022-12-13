@@ -250,7 +250,7 @@ parseWhereExp str = case P.doParse whereTokenP str of
 -- | Parse WHERE expressions (binary/unary operators are left associative)
 -- (modified from HW5)
 -- We first parse AND/OR operators, then comparison operators,
--- then +/-, then * & /, then unary operators)
+-- then + & -, then * & /, then (postfix) unary operators
 whereExpP :: Parser WhereExp
 whereExpP = sumP
   where
@@ -270,20 +270,24 @@ opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
 -- | Parses binary operators
 bopP :: Parser Bop
 bopP =
-  P.choice
-    [ constP "=" (Comp Eq),
-      constP ">" (Comp Gt),
-      constP ">=" (Comp Ge),
-      constP "<" (Comp Lt),
-      constP "<=" (Comp Le),
-      constP "+" (Arith Plus),
-      constP "-" (Arith Minus),
-      constP "*" (Arith Times),
-      constP "/" (Arith Divide),
-      constP "%" (Arith Modulo),
-      constP "and" (Logic And),
-      constP "or" (Logic Or)
-    ]
+  P.between whitespace bop whitespace
+  where
+    whitespace = many P.space
+    bop =
+      P.choice
+        [ constP "=" (Comp Eq),
+          constP ">" (Comp Gt),
+          constP ">=" (Comp Ge),
+          constP "<" (Comp Lt),
+          constP "<=" (Comp Le),
+          constP "+" (Arith Plus),
+          constP "-" (Arith Minus),
+          constP "*" (Arith Times),
+          constP "/" (Arith Divide),
+          constP "%" (Arith Modulo),
+          constP "and" (Logic And),
+          constP "or" (Logic Or)
+        ]
 
 -- | Parses unary operators
 uopP :: Parser Uop
