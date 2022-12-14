@@ -2,11 +2,13 @@
 
 {-# HLINT ignore "Use lambda-case" #-}
 
--- | A small, applicative-based parsing library (from HW5)
 -- NOTE: this library does not export the `P` data constructor.
 -- All `Parser`s must be built using the following functions
 -- exported by this file, as well as the `Functor`, `Applicative` and
 -- `Alternative` operations.
+
+-- | Modified the applicative-based parsing library from HW5
+-- so that doParse uses the Either monad instead of Maybe
 module Parser
   ( Parser,
     doParse,
@@ -35,7 +37,7 @@ module Parser
 where
 
 import Control.Applicative (Alternative (..))
-import Control.Monad (guard)
+import Control.Monad (guard, when)
 import Data.Char
 import Data.Foldable (asum)
 import System.IO qualified as IO
@@ -43,7 +45,7 @@ import System.IO.Error qualified as IO
 import Prelude hiding (filter)
 
 -- definition of the parser type
-newtype Parser a = P {doParse :: String -> Maybe (a, String)}
+newtype Parser a = P {doParse :: String -> Either ParseError (a, String)}
 
 instance Functor Parser where
   fmap :: (a -> b) -> Parser a -> Parser b
@@ -53,7 +55,7 @@ instance Functor Parser where
 
 instance Applicative Parser where
   pure :: a -> Parser a
-  pure x = P $ \s -> Just (x, s)
+  pure x = P $ \s -> Right (x, s)
 
   (<*>) :: Parser (a -> b) -> Parser a -> Parser b
   p1 <*> p2 = P $ \s -> do
@@ -63,10 +65,10 @@ instance Applicative Parser where
 
 instance Alternative Parser where
   empty :: Parser a
-  empty = P $ const Nothing
+  empty = P $ const $ Left "No parses"
 
   (<|>) :: Parser a -> Parser a -> Parser a
-  p1 <|> p2 = P $ \s -> doParse p1 s `firstJust` doParse p2 s
+  p1 <|> p2 = P $ \s -> doParse p1 s `firstRight` doParse p2 s
 
 -- We make Parser a Monad instance so that we can use bind
 instance Monad Parser where
@@ -79,30 +81,31 @@ instance Monad Parser where
     (a, s') <- doParse p s
     doParse (k a) s'
 
--- | Combine two Maybe values together, producing the first
+-- | Combine two Either values together, producing the first
 -- successful result
-firstJust :: Maybe a -> Maybe a -> Maybe a
-firstJust (Just x) _ = Just x
-firstJust Nothing y = y
+firstRight :: Either a b -> Either a b -> Either a b
+firstRight (Right x) _ = Right x
+firstRight (Left _) y = y
 
 -- | Return the next character from the input
 get :: Parser Char
 get = P $ \s -> case s of
-  (c : cs) -> Just (c, cs)
-  [] -> Nothing
+  (c : cs) -> Right (c, cs)
+  [] -> Left "No parses"
 
 -- | This parser *only* succeeds at the end of the input.
 eof :: Parser ()
 eof = P $ \s -> case s of
-  [] -> Just ((), [])
-  _ : _ -> Nothing
+  [] -> Right ((), [])
+  _ : _ -> Left "No parses"
 
 -- | Filter the parsing results by a predicate
 filter :: (a -> Bool) -> Parser a -> Parser a
 filter f p = P $ \s -> do
   (c, cs) <- doParse p s
-  guard (f c)
-  return (c, cs)
+  if f c
+    then return (c, cs)
+    else Left "Parsing results don't satisfy predicate"
 
 ---------------------------------------------------------------
 ---------------------------------------------------------------
@@ -115,8 +118,8 @@ type ParseError = String
 -- give it a type similar to other Parsing libraries.
 parse :: Parser a -> String -> Either ParseError a
 parse parser str = case doParse parser str of
-  Nothing -> Left "No parses"
-  Just (a, _) -> Right a
+  Left _ -> Left "No parses"
+  Right (a, _) -> Right a
 
 -- | parseFromFile p filePath runs a string parser p on the input
 -- read from filePath using readFile. Returns either a
