@@ -46,7 +46,7 @@ This folder defines HUnit and QuickCheck tests for our project.
 * `QuickCheckTests.hs` contains the code for our QuickCheck tests. 
 
 ## Order to be Read
-1. [Types.hs](src/Types)
+1. [Types](src/Types)
     * [SQLTypes.hs](src/Types/SQLTypes.hs)
     * [PandasTypes.hs](src/Types/PandasTypes.hs)
     * [Types.hs](src/Types/Types.hs)
