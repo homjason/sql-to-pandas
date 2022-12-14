@@ -29,18 +29,15 @@ This allows the user to input a SQL query as a String and outputs a Pandas comma
 
 ### `src`
 
+* `Types` folder defines the abstract syntax trees (ASTs) and algebraic data types (ADTs) for our project.
+  * `SQLTypes.hs` specifies the ADTs of our internal SQL Query representation
+  * `PandasTypes.hs` specifies the ADTs of our internal Pandas Command representation
+  * `Types.hs` specifies common ADTs between all of the types
+  * `TableTypes.hs` specifies the ADT for our internal Table representation. This is used for testing purposes
 * `Parser.hs` contains the code for parsers. This is adapted from Homework 5's `Parser.hs`
 * `SQLParser.hs` contains the code for SQL Query parsers
 * `Translator.hs` contains the code for translating from the SQL Query AST to the Pandas Command AST
 * `Print.hs` contains the code for pretty printing our Query and Command ASTs
-
-#### `Types`
-This folder defines the abstract syntax trees (ASTs) and algebraic data types (ADTs) for our project.
-
-* `SQLTypes.hs` specifies the ADTs of our internal SQL Query representation
-* `PandasTypes.hs` specifies the ADTs of our internal Pandas Command representation
-* `Types.hs` specifies common ADTs between all of the types
-* `TableTypes.hs` specifies the ADT for our internal Table representation. This is used for testing purposes
 
 ### `test`
 This folder defines HUnit and QuickCheck tests for our project.
@@ -50,10 +47,10 @@ This folder defines HUnit and QuickCheck tests for our project.
 
 ## Order to be Read
 1. [Types.hs](src/Types)
-  * [SQLTypes.hs](src/Types/SQLTypes.hs)
-  * [PandasTypes.hs](src/Types/PandasTypes.hs)
-  * [Types.hs](src/Types/Types.hs)
-  * [TableTypes.hs](src/Types/TableTypes.hs)
+    * [SQLTypes.hs](src/Types/SQLTypes.hs)
+    * [PandasTypes.hs](src/Types/PandasTypes.hs)
+    * [Types.hs](src/Types/Types.hs)
+    * [TableTypes.hs](src/Types/TableTypes.hs)
 2. [Parser.hs](src/Parser.hs)
 3. [SQLParser.hs](src/SQLParser.hs)
 4. [Translator.hs](src/Translator.hs)
