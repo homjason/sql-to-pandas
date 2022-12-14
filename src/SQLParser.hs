@@ -57,9 +57,12 @@ dotP = P.satisfy (== '.')
 -- underscores & periods, not beginning with a digit and not being a reserved word)
 -- (modified from HW5)
 nameP :: Parser ColName
-nameP = P.filter (`notElem` reserved) (wsP $ liftA2 (:) startChar $ many remainingChars)
+nameP =
+  P.filter
+    (`notElem` reserved)
+    (wsP $ liftA2 (:) startChar $ many remainingChars)
   where
-    startChar = P.alpha <|> P.char '_'
+    startChar = P.filter (\c -> c /= '(' && c /= ')') (P.alpha <|> P.char '_')
     remainingChars = startChar <|> P.digit <|> dotP
 
 -- Reserved keywords in SQL
@@ -121,9 +124,13 @@ numberP =
 number :: Parser String
 number = some P.digit
 
--- | Parses the SELECT token
+-- | Parses the SELECT token & consumes subsequent whitespace
 selectTokenP :: Parser ()
 selectTokenP = stringP "select"
+
+-- | Parses the string "SELECT DISTINCT" & consumes subsequent whitespace
+selectDistinctTokenP :: Parser ()
+selectDistinctTokenP = stringP "select distinct"
 
 -- | Parses the names of aggregate functions and returns a function from ColName -> ColExp
 aggFuncTokenP :: Parser (ColName -> ColExp)
@@ -153,48 +160,69 @@ aggFuncP =
 stripSpace :: String -> String
 stripSpace = dropWhileEnd isSpace . dropWhile isSpace
 
--- | Parses a string corresponding to a SELECT expression
--- parseSelectExp :: String -> Either P.ParseError SelectExp
--- parseSelectExp str =
---   case P.doParse selectTokenP str of
---     Left _ -> Left "No parses"
---     Right ((), remainderStr) ->
---       case remainderStr of
---         "*" -> Right Star
---         _ ->
---           let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
---            in case cols of
---                 [] -> Left "No columns selected in Query"
---                 hd : tl -> case hd of
---                   "distinct" -> Right $ DistinctCols (selectExpHelper tl)
---                   _ -> Right $ Cols (selectExpHelper cols)
-
 -- | Parses SELECT expressions
--- selectExpP :: Parser SelectExp
--- selectExpP = P.mkParser $ \s -> do
---   ((), remainder) <- P.doParse selectTokenP s
---   case remainder of
--- "*" -> Right (Star, "")
--- _ ->
---   let cols = map stripSpace (splitOnDelims [",", " "] remainder)
---    in case cols of
---         [] -> Left "No columns selected in Query"
---         hd : tl -> case hd of
---           "distinct" -> Right (DistinctCols (selectExpHelper tl), "")
---           _ -> Right (Cols (selectExpHelper cols), "")
 selectExpP :: Parser SelectExp
-selectExpP = stringP "select" *> selectP
+selectExpP =
+  P.choice
+    [ selectTokenP *> (Cols <$> P.sepBy1 colExpP (stringP ",")),
+      selectDistinctTokenP *> (DistinctCols <$> P.sepBy1 colExpP (stringP ","))
+    ]
+
+-- | Parser for column expressions (parses either a colname
+-- or an aggregate function applied to a column)
+colExpP :: Parser ColExp
+colExpP =
+  Agg <$> aggFuncP <*> parens colnameP
+    <|> Col <$> colnameP
   where
-    selectP = P.mkParser $ \s ->
-      case s of
-        "*" -> Right (Star, "")
-        _ ->
-          let cols = map stripSpace (splitOnDelims [",", " "] s)
-           in case cols of
-                [] -> Left "No columns selected in Query"
-                hd : tl -> case hd of
-                  "distinct" -> Right (DistinctCols (selectExpHelper tl), "")
-                  _ -> Right (Cols (selectExpHelper cols), "")
+    colnameP :: Parser ColName
+    colnameP =
+      P.setErrorMsg
+        (P.filter (`notElem` aggFuncNames) nameP)
+        "Invalid SELECT expression, make sure colnames are non-empty and are not SQL reserved keywords"
+
+-- Copied over unit tests to this file for the time being
+-- TODO: fix the two failing test cases
+test_colExpP :: Test
+test_colExpP =
+  "parsing individual columns in SELECT expressions"
+    ~: TestList
+      [ P.parse colExpP "col" ~?= Right (Col "col"),
+        P.parse colExpP "col2       " ~?= Right (Col "col2"),
+        P.parse colExpP "max(col)" ~?= Right (Agg Max "col"),
+        P.parse colExpP "avg(col1)" ~?= Right (Agg Avg "col1"),
+        P.parse colExpP "count(col2)" ~?= Right (Agg Count "col2"),
+        -- Check that the names of aggregate functions are
+        -- reserved keywords and can't be used as colnames
+        P.parse colExpP "max"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "min"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "avg"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "sum"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "count"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "max(max)"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "count(count)"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "select col1, max(max), col3"
+          ~?= Left selectErrorMsg,
+        -- No column specified in aggregate function
+        P.parse colExpP "sum()"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "min("
+          ~?= Left selectErrorMsg,
+        -- Invalid function calls
+        P.parse colExpP "dsgds(col)" ~?= Left "no parses",
+        P.parse colExpP "col(col)" ~?= Left "no parses"
+      ]
+  where
+    selectErrorMsg =
+      "Invalid SELECT expression, make sure colnames \
+      \are non-empty and are not SQL reserved keywords"
 
 -- | Split a string on multiple delimiters
 -- (Use foldl' to force the accumulator argument to be evaluated immediately)
@@ -204,7 +232,13 @@ splitOnDelims delims str =
     (not . null)
     (foldl' (\xs delim -> concatMap (splitOn delim) xs) [str] delims)
 
--- TODO: fix this to call colExpP instead!
+--   -- Make sure that columns don't share the same name as aggregate functions
+--   -- (Else return a ParseError via the empty Alternative)
+--   checkColName :: ColName -> Parser ColName
+--   checkColName s =
+--     if s `notElem` aggFuncNames
+--       then pure s
+--       else P.setErrorMsg empty "Error: colname uses reserved SQL keywords"
 
 -- | Recursive helper for iterating over list of colnames
 selectExpHelper :: [String] -> [ColExp]
@@ -213,31 +247,16 @@ selectExpHelper strs = rights (map parseSelectAttr strs)
 -- | Parses a single string as a ColExp
 -- (If there's a function call,
 -- split the string on parens to identify the aggregate function & column)
--- parseSelectAttr :: String -> Either P.ParseError ColExp
--- parseSelectAttr str =
---   let newStrs = splitOnDelims ["(", ")"] str
---    in case newStrs of
---         [col] -> Col <$> P.parse nameP str
---         [agg, col] ->
---           if agg `elem` aggFuncNames
---             then P.parse (aggFuncTokenP <*> parens nameP) str
---             else Left "Error: tried to call undefined function on a column"
---         _ -> Left "Error: Malformed SelectExp"
-
--- | Parser for column expressions (parses either a colname
--- or an aggregate function applied to a column)
-colExpP :: Parser ColExp
-colExpP =
-  (Agg <$> aggFuncP <*> parens (P.filter (`notElem` aggFuncNames) nameP))
-    <|> Col <$> (nameP >>= checkColName)
-  where
-    -- Make sure that columns don't share the same name as aggregate functions
-    -- (Else return a ParseError via the empty Alternative)
-    checkColName :: ColName -> Parser ColName
-    checkColName s =
-      if s `notElem` aggFuncNames
-        then pure s
-        else empty
+parseSelectAttr :: String -> Either P.ParseError ColExp
+parseSelectAttr str =
+  let newStrs = splitOnDelims ["(", ")"] str
+   in case newStrs of
+        [col] -> Col <$> P.parse nameP str
+        [agg, col] ->
+          if agg `elem` aggFuncNames
+            then P.parse (aggFuncTokenP <*> parens nameP) str
+            else Left "Error: tried to call undefined function on a column"
+        _ -> Left "Error: Malformed SelectExp"
 
 -- | Parses the token "from", consumes subsequent whitespace
 fromTokenP :: Parser ()
