@@ -33,6 +33,7 @@ module Parser
     between,
     sepBy1,
     sepBy,
+    setErrorMsg,
     mkParser,
   )
 where
@@ -54,9 +55,19 @@ import System.IO.Error qualified as IO
 import Prelude hiding (filter)
 
 -- Definition of the parser type
+-- Modified from HW5 -- in HW5 doParse returns Maybe (a, String)
 newtype Parser a = P {doParse :: String -> Either ParseError (a, String)}
 
--- | Helper function for creating a new Parser
+-- | Takes an existing parser and updates its doParse function with
+-- a specific error message
+setErrorMsg :: Parser a -> String -> Parser a
+setErrorMsg p errorMsg = P $ \s -> do
+  case doParse p s of
+    Left _ -> Left errorMsg
+    Right result -> Right result
+
+-- | Helper function for creating a new Parser with a user-specified
+-- specific doParse function
 mkParser :: (String -> Either ParseError (a, String)) -> Parser a
 mkParser f = P {doParse = f}
 
@@ -83,6 +94,7 @@ instance Alternative Parser where
   (<|>) :: Parser a -> Parser a -> Parser a
   p1 <|> p2 = P $ \s -> doParse p1 s `firstRight` doParse p2 s
 
+-- (Modified from HW5)
 -- We make Parser a Monad instance so that we can use bind
 instance Monad Parser where
   return :: a -> Parser a
@@ -129,9 +141,10 @@ type ParseError = String
 -- | Use a parser for a particular string. Note that this parser
 -- combinator library doesn't support descriptive parse errors, but we
 -- give it a type similar to other Parsing libraries.
+-- (Modified from HW5 to support custom error messages)
 parse :: Parser a -> String -> Either ParseError a
 parse parser str = case doParse parser str of
-  Left _ -> Left "No parses"
+  Left errorMsg -> Left errorMsg
   Right (a, _) -> Right a
 
 -- | parseFromFile p filePath runs a string parser p on the input
