@@ -1,7 +1,12 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use lambda-case" #-}
+
 module SQLParser where
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Error.Class (throwError)
 import Data.Char (isSpace, toLower)
 import Data.Either (rights)
 import Data.Functor (($>))
@@ -23,9 +28,7 @@ import Types.Types
 -- (Modification of P.parser in Parser.hs that returns
 -- both the parsed string & the remainder of the string)
 parseResult :: Parser a -> String -> Either P.ParseError (a, String)
-parseResult parser str = case P.doParse parser str of
-  Nothing -> Left "No parses"
-  Just (a, remainder) -> Right (a, remainder)
+parseResult = P.doParse
 
 -- | Takes a parser, runs it, & skips over any whitespace characters occurring
 -- afterwards (from HW5)
@@ -53,7 +56,7 @@ dotP = P.satisfy (== '.')
 -- | Parses tablenames / colnames (any sequence of upper & lowercase letters, digits,
 -- underscores & periods, not beginning with a digit and not being a reserved word)
 -- (modified from HW5)
-nameP :: Parser String
+nameP :: Parser ColName
 nameP = P.filter (`notElem` reserved) (wsP $ liftA2 (:) startChar $ many remainingChars)
   where
     startChar = P.alpha <|> P.char '_'
@@ -108,7 +111,12 @@ strToDouble :: String -> Double
 strToDouble = read :: String -> Double
 
 numberP :: Parser String
-numberP = P.choice [some P.digit, P.char '+' *> some P.digit, (:) <$> P.char '-' <*> some P.digit]
+numberP =
+  P.choice
+    [ some P.digit,
+      P.char '+' *> some P.digit,
+      (:) <$> P.char '-' <*> some P.digit
+    ]
 
 number :: Parser String
 number = some P.digit
@@ -130,25 +138,63 @@ aggFuncTokenP =
 aggFuncNames :: [String]
 aggFuncNames = ["count", "avg", "sum", "min", "max"]
 
+-- | Parses aggregate function names in SQL
+aggFuncP :: Parser AggFunc
+aggFuncP =
+  P.choice
+    [ constP "count" Count,
+      constP "avg" Avg,
+      constP "sum" Sum,
+      constP "min" Min,
+      constP "max" Max
+    ]
+
 -- | Strips leading/trailing whitespace from a string
 stripSpace :: String -> String
 stripSpace = dropWhileEnd isSpace . dropWhile isSpace
 
 -- | Parses a string corresponding to a SELECT expression
-parseSelectExp :: String -> Either P.ParseError SelectExp
-parseSelectExp str =
-  case P.doParse selectTokenP str of
-    Nothing -> Left "No parses"
-    Just ((), remainderStr) ->
-      case remainderStr of
-        "*" -> Right Star
+-- parseSelectExp :: String -> Either P.ParseError SelectExp
+-- parseSelectExp str =
+--   case P.doParse selectTokenP str of
+--     Left _ -> Left "No parses"
+--     Right ((), remainderStr) ->
+--       case remainderStr of
+--         "*" -> Right Star
+--         _ ->
+--           let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
+--            in case cols of
+--                 [] -> Left "No columns selected in Query"
+--                 hd : tl -> case hd of
+--                   "distinct" -> Right $ DistinctCols (selectExpHelper tl)
+--                   _ -> Right $ Cols (selectExpHelper cols)
+
+-- | Parses SELECT expressions
+-- selectExpP :: Parser SelectExp
+-- selectExpP = P.mkParser $ \s -> do
+--   ((), remainder) <- P.doParse selectTokenP s
+--   case remainder of
+-- "*" -> Right (Star, "")
+-- _ ->
+--   let cols = map stripSpace (splitOnDelims [",", " "] remainder)
+--    in case cols of
+--         [] -> Left "No columns selected in Query"
+--         hd : tl -> case hd of
+--           "distinct" -> Right (DistinctCols (selectExpHelper tl), "")
+--           _ -> Right (Cols (selectExpHelper cols), "")
+selectExpP :: Parser SelectExp
+selectExpP = stringP "select" *> selectP
+  where
+    selectP = P.mkParser $ \s ->
+      case s of
+        "*" -> Right (Star, "")
         _ ->
-          let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
+          let cols = map stripSpace (splitOnDelims [",", " "] s)
            in case cols of
                 [] -> Left "No columns selected in Query"
                 hd : tl -> case hd of
-                  "distinct" -> Right $ DistinctCols (selectExpHelper tl)
-                  _ -> Right $ Cols (selectExpHelper cols)
+                  "distinct" -> Right (DistinctCols (selectExpHelper tl), "")
+                  _ -> Right (Cols (selectExpHelper cols), "")
 
 -- | Split a string on multiple delimiters
 -- (Use foldl' to force the accumulator argument to be evaluated immediately)
@@ -158,6 +204,8 @@ splitOnDelims delims str =
     (not . null)
     (foldl' (\xs delim -> concatMap (splitOn delim) xs) [str] delims)
 
+-- TODO: fix this to call colExpP instead!
+
 -- | Recursive helper for iterating over list of colnames
 selectExpHelper :: [String] -> [ColExp]
 selectExpHelper strs = rights (map parseSelectAttr strs)
@@ -165,16 +213,31 @@ selectExpHelper strs = rights (map parseSelectAttr strs)
 -- | Parses a single string as a ColExp
 -- (If there's a function call,
 -- split the string on parens to identify the aggregate function & column)
-parseSelectAttr :: String -> Either P.ParseError ColExp
-parseSelectAttr str =
-  let newStrs = splitOnDelims ["(", ")"] str
-   in case newStrs of
-        [col] -> Col <$> P.parse nameP str
-        [agg, col] ->
-          if agg `elem` aggFuncNames
-            then P.parse (aggFuncTokenP <*> parens nameP) str
-            else Left "Error: tried to call undefined function on a column"
-        _ -> Left "Error: Malformed SelectExp"
+-- parseSelectAttr :: String -> Either P.ParseError ColExp
+-- parseSelectAttr str =
+--   let newStrs = splitOnDelims ["(", ")"] str
+--    in case newStrs of
+--         [col] -> Col <$> P.parse nameP str
+--         [agg, col] ->
+--           if agg `elem` aggFuncNames
+--             then P.parse (aggFuncTokenP <*> parens nameP) str
+--             else Left "Error: tried to call undefined function on a column"
+--         _ -> Left "Error: Malformed SelectExp"
+
+-- | Parser for column expressions (parses either a colname
+-- or an aggregate function applied to a column)
+colExpP :: Parser ColExp
+colExpP =
+  (Agg <$> aggFuncP <*> parens (P.filter (`notElem` aggFuncNames) nameP))
+    <|> Col <$> (nameP >>= checkColName)
+  where
+    -- Make sure that columns don't share the same name as aggregate functions
+    -- (Else return a ParseError via the empty Alternative)
+    checkColName :: ColName -> Parser ColName
+    checkColName s =
+      if s `notElem` aggFuncNames
+        then pure s
+        else empty
 
 -- | Parses the token "from", consumes subsequent whitespace
 fromTokenP :: Parser ()
@@ -200,8 +263,8 @@ joinTokenP =
 parseFromExp :: String -> Either P.ParseError FromExp
 parseFromExp str =
   case P.doParse fromTokenP str of
-    Nothing -> Left "Error: No parses, malformed FROM expression"
-    Just ((), remainder) ->
+    Left _ -> Left "Error: No parses, malformed FROM expression"
+    Right ((), remainder) ->
       -- Split the remainder of the query string & identify JOIN expressions
       case words remainder of
         [] -> Left "Error: No table selected in FROM expression"
@@ -247,8 +310,8 @@ whereTokenP = stringP "where"
 -- Parses Where expressions
 parseWhereExp :: String -> Either P.ParseError WhereExp
 parseWhereExp str = case P.doParse whereTokenP str of
-  Nothing -> Left "No parses"
-  Just ((), remainder) -> P.parse whereExpP remainder
+  Left _ -> Left "No parses"
+  Right ((), remainder) -> P.parse whereExpP remainder
 
 -- | Parse WHERE expressions (binary/unary operators are left associative)
 -- (modified from HW5)
@@ -322,14 +385,14 @@ groupByTokenP :: Parser ()
 groupByTokenP = stringP "group by"
 
 -- Parse GROUP BY expressions
-parseGroupByExp :: String -> Either P.ParseError [ColName]
-parseGroupByExp str = case P.doParse groupByTokenP str of
-  Nothing -> Left "No parses"
-  Just ((), remainderStr) ->
-    let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
-     in case cols of
-          [] -> Left "No columns selected in Group By"
-          hd : tl -> Right cols
+-- parseGroupByExp :: String -> Either P.ParseError [ColName]
+-- parseGroupByExp str = case P.doParse groupByTokenP str of
+--   Nothing -> Left "No parses"
+--   Just ((), remainderStr) ->
+--     let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
+--      in case cols of
+--           [] -> Left "No columns selected in Group By"
+--           hd : tl -> Right cols
 
 orderByTokenP :: Parser ()
 orderByTokenP = stringP "order by"
@@ -339,8 +402,8 @@ orderByTokenP = stringP "order by"
 parseOrderByExp :: String -> Either P.ParseError (ColName, Order)
 parseOrderByExp str =
   case P.doParse orderByTokenP str of
-    Nothing -> Left "no parses"
-    Just ((), remainder) ->
+    Left _ -> Left "no parses"
+    Right ((), remainder) ->
       let orderByExp = map stripSpace (splitOnDelims [",", " "] remainder)
        in case orderByExp of
             [] -> Left "Incomplete Order By expression"
@@ -371,20 +434,20 @@ parseLimitExp = P.parse limitP
 
 -- | Infers whether a query condition is a WHERE, a GROUP BY,
 -- an ORDER BY or a LIMIT
-inferCondition :: String -> Either P.ParseError Condition
-inferCondition str =
-  case parseWhereExp str of
-    Right whereExp -> Right $ Wher whereExp
-    Left e1 ->
-      case parseGroupByExp str of
-        Right groupByCols -> Right $ SQL.GroupBy groupByCols
-        Left e2 ->
-          case parseOrderByExp str of
-            Right orderByExp -> Right $ OrderBy orderByExp
-            Left e3 ->
-              case parseLimitExp str of
-                Right numRows -> Right $ Limit numRows
-                Left e4 -> Left "Malformed SQL query"
+-- inferCondition :: String -> Either P.ParseError Condition
+-- inferCondition str =
+--   case parseWhereExp str of
+--     Right whereExp -> Right $ Wher whereExp
+--     Left e1 ->
+--       case parseGroupByExp str of
+--         Right groupByCols -> Right $ SQL.GroupBy groupByCols
+--         Left e2 ->
+--           case parseOrderByExp str of
+--             Right orderByExp -> Right $ OrderBy orderByExp
+--             Left e3 ->
+--               case parseLimitExp str of
+--                 Right numRows -> Right $ Limit numRows
+--                 Left e4 -> Left "Malformed SQL query"
 
 -- | Construct a Query based on a SelectExp, FromExp & some condition
 mkQuery :: SelectExp -> FromExp -> Condition -> Query
@@ -435,51 +498,51 @@ mkQuery3 s f c1 c2 c3 =
 -- ob = ORDER BY expression
 -- l = LIMIT expression
 -- c = Arbitrary SQL query condition (WHERE/GROUP BY/ORDER BY/LIMIT)
-parseQuery :: String -> Either P.ParseError Query
-parseQuery str =
-  case splitQueryString str of
-    [] -> Left "No parses"
-    [select, from] -> do
-      s <- parseSelectExp select
-      f <- parseFromExp from
-      Right $ Query s f Nothing Nothing Nothing Nothing
-    [select, from, c] -> do
-      s <- parseSelectExp select
-      f <- parseFromExp from
-      case inferCondition c of
-        Left errorMsg -> Left errorMsg
-        Right c' -> Right $ mkQuery s f c'
-    [select, from, c1, c2] -> do
-      s <- parseSelectExp select
-      f <- parseFromExp from
-      case (inferCondition c1, inferCondition c2) of
-        (Right w@(Wher _), Right gb@(SQL.GroupBy _)) -> mkQuery2 s f w gb
-        (Right w@(Wher _), Right ob@(OrderBy _)) -> mkQuery2 s f w ob
-        (Right w@(Wher _), Right l@(Limit _)) -> mkQuery2 s f w l
-        (Right gb@(SQL.GroupBy _), Right ob@(OrderBy _)) -> mkQuery2 s f gb ob
-        (Right gb@(SQL.GroupBy _), Right l@(Limit _)) -> mkQuery2 s f gb l
-        (Right ob@(OrderBy _), Right l@(Limit _)) -> mkQuery2 s f ob l
-        (_, _) -> Left "Malformed SQL query"
-    [select, from, c1, c2, c3] -> do
-      s <- parseSelectExp select
-      f <- parseFromExp from
-      case (inferCondition c1, inferCondition c2, inferCondition c3) of
-        (Right w@(Wher _), Right gb@(SQL.GroupBy _), Right ob@(OrderBy _)) ->
-          mkQuery3 s f w gb ob
-        (Right w@(Wher _), Right ob@(OrderBy _), Right l@(Limit _)) ->
-          mkQuery3 s f w ob l
-        (Right gb@(SQL.GroupBy _), Right ob@(OrderBy _), Right l@(Limit _)) ->
-          mkQuery3 s f gb ob l
-        (_, _, _) -> Left "Malformed SQL query"
-    [select, from, wher, groupBy, orderBy, limit] -> do
-      s <- parseSelectExp select
-      f <- parseFromExp from
-      w <- parseWhereExp wher
-      gb <- parseGroupByExp groupBy
-      ob <- parseOrderByExp orderBy
-      l <- parseLimitExp limit
-      Right $ Query s f (Just w) (Just gb) (Just ob) (Just l)
-    _ -> Left "Invalid SQL Query"
+-- parseQuery :: String -> Either P.ParseError Query
+-- parseQuery str =
+--   case splitQueryString str of
+--     [] -> Left "No parses"
+--     [select, from] -> do
+--       s <- parseSelectExp select
+--       f <- parseFromExp from
+--       Right $ Query s f Nothing Nothing Nothing Nothing
+--     [select, from, c] -> do
+--       s <- parseSelectExp select
+--       f <- parseFromExp from
+--       case inferCondition c of
+--         Left errorMsg -> Left errorMsg
+--         Right c' -> Right $ mkQuery s f c'
+--     [select, from, c1, c2] -> do
+--       s <- parseSelectExp select
+--       f <- parseFromExp from
+--       case (inferCondition c1, inferCondition c2) of
+--         (Right w@(Wher _), Right gb@(SQL.GroupBy _)) -> mkQuery2 s f w gb
+--         (Right w@(Wher _), Right ob@(OrderBy _)) -> mkQuery2 s f w ob
+--         (Right w@(Wher _), Right l@(Limit _)) -> mkQuery2 s f w l
+--         (Right gb@(SQL.GroupBy _), Right ob@(OrderBy _)) -> mkQuery2 s f gb ob
+--         (Right gb@(SQL.GroupBy _), Right l@(Limit _)) -> mkQuery2 s f gb l
+--         (Right ob@(OrderBy _), Right l@(Limit _)) -> mkQuery2 s f ob l
+--         (_, _) -> Left "Malformed SQL query"
+--     [select, from, c1, c2, c3] -> do
+--       s <- parseSelectExp select
+--       f <- parseFromExp from
+--       case (inferCondition c1, inferCondition c2, inferCondition c3) of
+--         (Right w@(Wher _), Right gb@(SQL.GroupBy _), Right ob@(OrderBy _)) ->
+--           mkQuery3 s f w gb ob
+--         (Right w@(Wher _), Right ob@(OrderBy _), Right l@(Limit _)) ->
+--           mkQuery3 s f w ob l
+--         (Right gb@(SQL.GroupBy _), Right ob@(OrderBy _), Right l@(Limit _)) ->
+--           mkQuery3 s f gb ob l
+--         (_, _, _) -> Left "Malformed SQL query"
+--     [select, from, wher, groupBy, orderBy, limit] -> do
+--       s <- parseSelectExp select
+--       f <- parseFromExp from
+--       w <- parseWhereExp wher
+--       gb <- parseGroupByExp groupBy
+--       ob <- parseOrderByExp orderBy
+--       l <- parseLimitExp limit
+--       Right $ Query s f (Just w) (Just gb) (Just ob) (Just l)
+--     _ -> Left "Invalid SQL Query"
 
 -- Converts query string to lower case, splits on newlines
 -- & strips leading/trailing whitespace
@@ -572,11 +635,11 @@ noDistinctAndGroupBy _ (Just _) = Right True
 noDistinctAndGroupBy _ Nothing = Right True
 
 -- Parses the string into a query and translates it into a Pandas Command
-runParseAndTranslate :: String -> Either P.ParseError Command
-runParseAndTranslate s = case parseQuery s of
-  Left str -> Left str
-  Right q ->
-    case validateQuery q of
-      Left validateError -> Left validateError
-      Right False -> Left "Invalid SQL query"
-      Right True -> Right $ translateSQL q
+-- runParseAndTranslate :: String -> Either P.ParseError Command
+-- runParseAndTranslate s = case parseQuery s of
+--   Left str -> Left str
+--   Right q ->
+--     case validateQuery q of
+--       Left validateError -> Left validateError
+--       Right False -> Left "Invalid SQL query"
+--       Right True -> Right $ translateSQL q

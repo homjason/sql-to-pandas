@@ -33,19 +33,32 @@ module Parser
     between,
     sepBy1,
     sepBy,
+    mkParser,
   )
 where
 
 import Control.Applicative (Alternative (..))
 import Control.Monad (guard, when)
+import Control.Monad.Error.Class
 import Data.Char
+  ( Char,
+    isAlpha,
+    isDigit,
+    isLower,
+    isSpace,
+    isUpper,
+  )
 import Data.Foldable (asum)
 import System.IO qualified as IO
 import System.IO.Error qualified as IO
 import Prelude hiding (filter)
 
--- definition of the parser type
+-- Definition of the parser type
 newtype Parser a = P {doParse :: String -> Either ParseError (a, String)}
+
+-- | Helper function for creating a new Parser
+mkParser :: (String -> Either ParseError (a, String)) -> Parser a
+mkParser f = P {doParse = f}
 
 instance Functor Parser where
   fmap :: (a -> b) -> Parser a -> Parser b

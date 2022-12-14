@@ -44,23 +44,47 @@ test_splitOnDelims =
         splitOnDelims [",", " "] "" ~?= []
       ]
 
-test_parseSelectExp :: Test
-test_parseSelectExp =
-  "parsing SELECT expressions"
+test_selectExpP :: Test
+test_selectExpP =
+  "parsing overall SELECT expressions"
     ~: TestList
-      [ parseSelectExp "select col1" ~?= Right (Cols [Col "col1"]),
-        parseSelectExp "select col1, col2, col3"
+      [ P.parse selectExpP "select col1"
+          ~?= Right (Cols [Col "col1"]),
+        P.parse selectExpP "select col1, col2, col3"
           ~?= Right (Cols [Col "col1", Col "col2", Col "col3"]),
-        parseSelectExp "select distinct col1"
+        P.parse selectExpP "select distinct col1"
           ~?= Right (DistinctCols [Col "col1"]),
-        parseSelectExp "select distinct col1, col2, col3"
+        P.parse selectExpP "select distinct col1, col2, col3"
           ~?= Right (DistinctCols [Col "col1", Col "col2", Col "col3"]),
-        parseSelectExp "select count(col1)"
+        P.parse selectExpP "select count(col1)"
           ~?= Right (Cols [SQL.Agg Count "col1"])
       ]
 
--- >>> runTestTT test_parseSelectExp
--- Counts {cases = 5, tried = 5, errors = 0, failures = 0}
+test_colExpP :: Test
+test_colExpP =
+  "parsing individual columns in SELECT expressions"
+    ~: TestList
+      [ P.parse colExpP "col" ~?= Right (Col "col"),
+        P.parse colExpP "col2       " ~?= Right (Col "col2"),
+        P.parse colExpP "max(col)" ~?= Right (Agg Max "col"),
+        P.parse colExpP "avg(col1)" ~?= Right (Agg Avg "col1"),
+        P.parse colExpP "count(col2)" ~?= Right (Agg Count "col2"),
+        -- Check that the names of aggregate functions are
+        -- reserved keywords and can't be used as colnames
+        P.parse colExpP "max" ~?= Left "No parses",
+        P.parse colExpP "min" ~?= Left "No parses",
+        P.parse colExpP "avg" ~?= Left "No parses",
+        P.parse colExpP "sum" ~?= Left "No parses",
+        P.parse colExpP "count" ~?= Left "No parses",
+        P.parse colExpP "max(max)" ~?= Left "No parses",
+        P.parse colExpP "count(count)" ~?= Left "No parses",
+        -- No column specified in aggregate function
+        P.parse colExpP "sum()" ~?= Left "No parses",
+        P.parse colExpP "min(" ~?= Left "No parses",
+        -- Invalid function calls
+        P.parse colExpP "dsgds(col)" ~?= Left "no parses",
+        P.parse colExpP "col(col)" ~?= Left "no parses"
+      ]
 
 -- TODO: fix failing test cases
 test_parseWhereExp :: Test
