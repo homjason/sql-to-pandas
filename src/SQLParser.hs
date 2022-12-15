@@ -9,7 +9,7 @@ import Control.Monad
 import Control.Monad.Error.Class (throwError)
 import Data.Char (isSpace, toLower)
 import Data.Either (rights)
-import Data.Functor (($>))
+import Data.Functor (($>), (<&>))
 import Data.List (dropWhileEnd, foldl')
 import Data.List.Split (splitOn)
 import Data.Set (Set, disjoint, isSubsetOf)
@@ -224,40 +224,6 @@ test_colExpP =
       "Invalid SELECT expression, make sure colnames \
       \are non-empty and are not SQL reserved keywords"
 
--- | Split a string on multiple delimiters
--- (Use foldl' to force the accumulator argument to be evaluated immediately)
-splitOnDelims :: [String] -> String -> [String]
-splitOnDelims delims str =
-  filter
-    (not . null)
-    (foldl' (\xs delim -> concatMap (splitOn delim) xs) [str] delims)
-
---   -- Make sure that columns don't share the same name as aggregate functions
---   -- (Else return a ParseError via the empty Alternative)
---   checkColName :: ColName -> Parser ColName
---   checkColName s =
---     if s `notElem` aggFuncNames
---       then pure s
---       else P.setErrorMsg empty "Error: colname uses reserved SQL keywords"
-
--- | Recursive helper for iterating over list of colnames
-selectExpHelper :: [String] -> [ColExp]
-selectExpHelper strs = rights (map parseSelectAttr strs)
-
--- | Parses a single string as a ColExp
--- (If there's a function call,
--- split the string on parens to identify the aggregate function & column)
-parseSelectAttr :: String -> Either P.ParseError ColExp
-parseSelectAttr str =
-  let newStrs = splitOnDelims ["(", ")"] str
-   in case newStrs of
-        [col] -> Col <$> P.parse nameP str
-        [agg, col] ->
-          if agg `elem` aggFuncNames
-            then P.parse (aggFuncTokenP <*> parens nameP) str
-            else Left "Error: tried to call undefined function on a column"
-        _ -> Left "Error: Malformed SelectExp"
-
 -- | Parses the token "from", consumes subsequent whitespace
 fromTokenP :: Parser ()
 fromTokenP = stringP "from"
@@ -277,27 +243,20 @@ joinTokenP =
     <|> constP "left join" LeftJoin
     <|> constP "right join" RightJoin
 
--- | Parses FROM expressions
--- TODO: handle subqueries!
-parseFromExp :: String -> Either P.ParseError FromExp
-parseFromExp str =
-  case P.doParse fromTokenP str of
-    Left _ -> Left "Error: No parses, malformed FROM expression"
-    Right ((), remainder) ->
-      -- Split the remainder of the query string & identify JOIN expressions
-      case words remainder of
-        [] -> Left "Error: No table selected in FROM expression"
-        [tableName] -> Right $ Table tableName Nothing
-        _ ->
-          case parseJoinExp remainder of
-            Right joinExp@(Join leftT _ _ _ _) -> Right $ Table leftT (Just joinExp)
-            Left errorMsg -> Left errorMsg
+-- | Parser for FROM expressions
+-- TODO: handle subqueries
+fromExpP :: Parser FromExp
+fromExpP =
+  P.choice
+    [ fromTokenP *> (TableJoin <$> joinExpP),
+      fromTokenP *> (Table <$> nameP)
+    ]
 
 -- | Parses JOIN expressions
 -- (resolves the two tables & columns partaking in the join)
--- For simplicity, we explciitly disallow joining the same table with itself
-parseJoinExp :: String -> Either P.ParseError JoinExp
-parseJoinExp str = do
+-- For simplicity, we disallow joining the same table with itself
+joinExpP :: Parser JoinExp
+joinExpP = P.mkParser $ \str -> do
   (leftT, s') <- parseResult nameP str
   (joinStyle, s'') <- parseResult joinTokenP s'
   (rightT, joinCond) <- parseResult nameP s''
@@ -313,31 +272,28 @@ parseJoinExp str = do
       unless
         (leftT == leftT' && rightT == rightT')
         (Left "Tables being JOINed != tables being selected FROM")
-      Right $
-        Join
-          { leftTable = leftT,
-            leftCol = leftC,
-            rightTable = rightT,
-            rightCol = rightC,
-            style = joinStyle
-          }
+      Right
+        ( Join
+            { leftTable = leftT,
+              leftCol = leftC,
+              rightTable = rightT,
+              rightCol = rightC,
+              style = joinStyle
+            },
+          ""
+        )
     (_, _) -> Left "Malformed JOIN condition"
 
+-- | Parses the string "where" & consumes subsequent whitespace
 whereTokenP :: Parser ()
 whereTokenP = stringP "where"
-
--- Parses Where expressions
-parseWhereExp :: String -> Either P.ParseError WhereExp
-parseWhereExp str = case P.doParse whereTokenP str of
-  Left _ -> Left "No parses"
-  Right ((), remainder) -> P.parse whereExpP remainder
 
 -- | Parse WHERE expressions (binary/unary operators are left associative)
 -- (modified from HW5)
 -- We first parse AND/OR operators, then comparison operators,
 -- then + & -, then * & /, then (postfix) unary operators
 whereExpP :: Parser WhereExp
-whereExpP = logicP
+whereExpP = whereTokenP *> logicP
   where
     logicP = compP `P.chainl1` opAtLevel (level (Logic And))
     compP = sumP `P.chainl1` opAtLevel (level (Comp Gt))
@@ -348,7 +304,7 @@ whereExpP = logicP
         <|> baseP
     baseP =
       CompVal <$> comparableP
-        <|> parens whereExpP
+        <|> parens logicP
 
 -- | Parse an operator at a specified precedence level (from HW5)
 opAtLevel :: Int -> Parser (WhereExp -> WhereExp -> WhereExp)
@@ -403,6 +359,7 @@ comparableP =
 groupByTokenP :: Parser ()
 groupByTokenP = stringP "group by"
 
+-- TODO: rewrite using Parser
 -- Parse GROUP BY expressions
 -- parseGroupByExp :: String -> Either P.ParseError [ColName]
 -- parseGroupByExp str = case P.doParse groupByTokenP str of
@@ -418,20 +375,20 @@ orderByTokenP = stringP "order by"
 
 -- Parse ORDER BY expressions
 -- Note: we specify that we can only sort by one column
-parseOrderByExp :: String -> Either P.ParseError (ColName, Order)
-parseOrderByExp str =
-  case P.doParse orderByTokenP str of
-    Left _ -> Left "no parses"
-    Right ((), remainder) ->
-      let orderByExp = map stripSpace (splitOnDelims [",", " "] remainder)
-       in case orderByExp of
-            [] -> Left "Incomplete Order By expression"
-            [col] -> Right (col, Asc)
-            [col, order] ->
-              case stringToOrder order of
-                Just ord -> Right (col, ord)
-                Nothing -> Left "Error: invalid sort order"
-            _ -> Left "Too many tokens in Order By expression"
+-- parseOrderByExp :: String -> Either P.ParseError (ColName, Order)
+-- parseOrderByExp str =
+--   case P.doParse orderByTokenP str of
+--     Left _ -> Left "no parses"
+--     Right ((), remainder) ->
+--       let orderByExp = map stripSpace (splitOnDelims [",", " "] remainder)
+--        in case orderByExp of
+--             [] -> Left "Incomplete Order By expression"
+--             [col] -> Right (col, Asc)
+--             [col, order] ->
+--               case stringToOrder order of
+--                 Just ord -> Right (col, ord)
+--                 Nothing -> Left "Error: invalid sort order"
+--             _ -> Left "Too many tokens in Order By expression"
 
 -- Helper function: converts a string representing a sort order to an Order
 stringToOrder :: String -> Maybe Order

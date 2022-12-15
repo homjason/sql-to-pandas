@@ -87,185 +87,185 @@ test_colExpP =
       ]
 
 -- TODO: fix failing test cases
-test_parseWhereExp :: Test
-test_parseWhereExp =
+test_whereExpP :: Test
+test_whereExpP =
   "parsing WHERE expressions"
     ~: TestList
-      [ parseWhereExp "where 1 + 2"
+      [ P.parse whereExpP "where 1 + 2"
           ~?= Right
             ( Op2
                 (CompVal (LitInt 1))
                 (Arith Plus)
                 (CompVal (LitInt 2))
             ),
-        parseWhereExp "where (1) + (2)"
+        P.parse whereExpP "where (1) + (2)"
           ~?= Right
             ( Op2
                 (CompVal (LitInt 1))
                 (Arith Plus)
                 (CompVal (LitInt 2))
             ),
-        parseWhereExp "where 1 * 2"
+        P.parse whereExpP "where 1 * 2"
           ~?= Right
             ( Op2
                 (CompVal (LitInt 1))
                 (Arith Times)
                 (CompVal (LitInt 2))
             ),
-        parseWhereExp "where 1*2"
+        P.parse whereExpP "where 1*2"
           ~?= Right
             ( Op2
                 (CompVal (LitInt 1))
                 (Arith Times)
                 (CompVal (LitInt 2))
             ),
-        parseWhereExp "where     2          *   3"
+        P.parse whereExpP "where     2          *   3"
           ~?= Right
             ( Op2
                 (CompVal (LitInt 2))
                 (Arith Times)
                 (CompVal (LitInt 3))
             ),
-        parseWhereExp "where 4 / 2"
+        P.parse whereExpP "where 4 / 2"
           ~?= Right
             ( Op2
                 (CompVal (LitInt 4))
                 (Arith Divide)
                 (CompVal (LitInt 2))
             ),
-        parseWhereExp "where 3 - 2"
+        P.parse whereExpP "where 3 - 2"
           ~?= Right
             ( Op2
                 (CompVal (LitInt 3))
                 (Arith Minus)
                 (CompVal (LitInt 2))
             ),
-        parseWhereExp "where 1 < 2"
+        P.parse whereExpP "where 1 < 2"
           ~?= Right
             ( Op2
                 (CompVal (LitInt 1))
                 (Comp Lt)
                 (CompVal (LitInt 2))
             ),
-        parseWhereExp "where col > 0"
+        P.parse whereExpP "where col > 0"
           ~?= Right
             ( Op2
                 (CompVal (ColName "col"))
                 (Comp Gt)
                 (CompVal (LitInt 0))
             ),
-        parseWhereExp "where col < 1"
+        P.parse whereExpP "where col < 1"
           ~?= Right
             ( Op2
                 (CompVal (ColName "col"))
                 (Comp Lt)
                 (CompVal (LitInt 1))
             ),
-        parseWhereExp "where col = \"hello\""
+        P.parse whereExpP "where col = \"hello\""
           ~?= Right
             ( Op2
                 (CompVal (ColName "col"))
                 (Comp Eq)
                 (CompVal (LitString "hello"))
             ),
-        parseWhereExp "where col != \"invalid\""
+        P.parse whereExpP "where col != \"invalid\""
           ~?= Right
             ( Op2
                 (CompVal (ColName "col"))
                 (Comp Neq)
                 (CompVal (LitString "invalid"))
             ),
-        parseWhereExp "where col = 5"
+        P.parse whereExpP "where col = 5"
           ~?= Right
             ( Op2
                 (CompVal (ColName "col"))
                 (Comp Eq)
                 (CompVal (LitInt 5))
             ),
-        parseWhereExp "where col != 0"
+        P.parse whereExpP "where col != 0"
           ~?= Right
             ( Op2
                 (CompVal (ColName "col"))
                 (Comp Neq)
                 (CompVal (LitInt 0))
             ),
-        parseWhereExp "where col1 != col2"
+        P.parse whereExpP "where col1 != col2"
           ~?= Right
             ( Op2
                 (CompVal (ColName "col1"))
                 (Comp Neq)
                 (CompVal (ColName "col2"))
             ),
-        parseWhereExp "where col is null"
+        P.parse whereExpP "where col is null"
           ~?= Right (Op1 (CompVal (ColName "col")) IsNull),
-        parseWhereExp "where col is not null"
+        P.parse whereExpP "where col is not null"
           ~?= Right (Op1 (CompVal (ColName "col")) IsNotNull),
-        parseWhereExp "where col              is null"
+        P.parse whereExpP "where col              is null"
           ~?= Right (Op1 (CompVal (ColName "col")) IsNull),
-        parseWhereExp "where col > 5"
+        P.parse whereExpP "where col > 5"
           ~?= Right
             ( Op2
                 (CompVal (ColName "col"))
                 (Comp Gt)
                 (CompVal (LitInt 5))
             ),
-        parseWhereExp "where col                <= 5"
+        P.parse whereExpP "where col                <= 5"
           ~?= Right
             ( Op2
                 (CompVal (ColName "col"))
                 (Comp Le)
                 (CompVal (LitInt 5))
             ),
-        parseWhereExp "where col + 1 = 2"
+        P.parse whereExpP "where col + 1 = 2"
           ~?= Right
             ( Op2
                 (Op2 (CompVal (ColName "col")) (Arith Plus) (CompVal (LitInt 1)))
                 (Comp Eq)
                 (CompVal (LitInt 2))
             ),
-        parseWhereExp "where (col1 is null) and (col2 is not null)"
+        P.parse whereExpP "where (col1 is null) and (col2 is not null)"
           ~?= Right
             ( Op2
                 (Op1 (CompVal (ColName "col1")) IsNull)
                 (Logic And)
                 (Op1 (CompVal (ColName "col2")) IsNotNull)
             ),
-        parseWhereExp "where (col1 is null) or (col2 >= 0)"
+        P.parse whereExpP "where (col1 is null) or (col2 >= 0)"
           ~?= Right
             ( Op2
                 (Op1 (CompVal (ColName "col1")) IsNull)
                 (Logic Or)
                 (Op2 (CompVal (ColName "col2")) (Comp Ge) (CompVal (LitInt 0)))
             ),
-        parseWhereExp "where (col1 / col2) and (col2 != 0)"
+        P.parse whereExpP "where (col1 / col2) and (col2 != 0)"
           ~?= Right
             ( Op2
                 (Op2 (CompVal (ColName "col1")) (Arith Divide) (CompVal (ColName "col2")))
                 (Logic And)
                 (Op2 (CompVal (ColName "col2")) (Comp Neq) (CompVal (LitInt 0)))
             ),
-        parseWhereExp "where col1 + col2 > 3"
+        P.parse whereExpP "where col1 + col2 > 3"
           ~?= Right
             ( Op2
                 (Op2 (CompVal (ColName "col1")) (Arith Plus) (CompVal (ColName "col2")))
                 (Comp Gt)
                 (CompVal (LitInt 3))
             ),
-        parseWhereExp "where col1 - col2 = col3 - col4"
+        P.parse whereExpP "where col1 - col2 = col3 - col4"
           ~?= Right
             ( Op2
                 (Op2 (CompVal (ColName "col1")) (Arith Minus) (CompVal (ColName "col2")))
                 (Comp Eq)
                 (Op2 (CompVal (ColName "col3")) (Arith Minus) (CompVal (ColName "col4")))
             ),
-        parseWhereExp "where type = \"savings\" and balance < 100"
+        P.parse whereExpP "where type = \"savings\" and balance < 100"
           ~?= Right
             ( Op2
                 (Op2 (CompVal (ColName "type")) (Comp Eq) (CompVal (LitString "savings")))
                 (Logic And)
                 (Op2 (CompVal (ColName "balance")) (Comp Lt) (CompVal (LitInt 100)))
             ),
-        parseWhereExp "where C.balance > 1000 and D.amount > 100"
+        P.parse whereExpP "where C.balance > 1000 and D.amount > 100"
           ~?= Right
             ( Op2
                 ( Op2
@@ -282,7 +282,7 @@ test_parseWhereExp =
             ),
         -- Check that arithmetic operations are
         -- parsed in a left associative manner
-        parseWhereExp "where 10 * 2 + 1"
+        P.parse whereExpP "where 10 * 2 + 1"
           ~?= Right
             ( Op2
                 ( Op2
@@ -295,7 +295,7 @@ test_parseWhereExp =
             ),
         -- Check that parens in arithmetic operations
         -- are parsed correctly
-        parseWhereExp "where 10 * (2 + 1)"
+        P.parse whereExpP "where 10 * (2 + 1)"
           ~?= Right
             ( Op2
                 (CompVal (LitInt 10))
@@ -307,7 +307,7 @@ test_parseWhereExp =
                 )
             ),
         -- Should be parsed as "(1 + (10 * 2)) + 100"
-        parseWhereExp "where 1 + 10 * 2 + 100"
+        P.parse whereExpP "where 1 + 10 * 2 + 100"
           ~?= Right
             ( Op2
                 ( Op2
@@ -323,7 +323,7 @@ test_parseWhereExp =
                 (CompVal (LitInt 100))
             ),
         -- Should be parsed as "1 + ((10 * 2) + 100)"
-        parseWhereExp "where 1 + (10 * 2 + 100)"
+        P.parse whereExpP "where 1 + (10 * 2 + 100)"
           ~?= Right
             ( Op2
                 (CompVal (LitInt 1))
@@ -450,62 +450,56 @@ test_parseQuery =
 
 -- >>> runTestTT test_parseQuery
 
--- >>> runTestTT test_parseFromExp
+-- >>> runTestTT test_P.parse fromExpP
 -- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
 
-test_parseFromExp :: Test
-test_parseFromExp =
+test_fromExpP :: Test
+test_fromExpP =
   "parsing FROM expressions"
     ~: TestList
-      [ parseFromExp "from A" ~?= Right (Table "A" Nothing),
-        parseFromExp "from a join b on a.col = b.col"
+      [ P.parse fromExpP "from A" ~?= Right (Table "A"),
+        P.parse fromExpP "from a join b on a.col = b.col"
           ~?= Right
-            ( Table
-                "a"
-                ( Just $
-                    Join
-                      { leftTable = "a",
-                        leftCol = "col",
-                        rightTable = "b",
-                        rightCol = "col",
-                        style = InnerJoin
-                      }
-                )
-            ),
-        parseFromExp "from df1 left join df2 on df1.col1 = df2.col2"
-          ~?= Right
-            ( Table
-                "df1"
-                ( Just $
-                    Join
-                      { leftTable = "df1",
-                        leftCol = "col1",
-                        rightTable = "df2",
-                        rightCol = "col2",
-                        style = LeftJoin
-                      }
-                )
-            ),
-        parseFromExp "from (select col from B)"
-          ~?= Right
-            ( SubQuery
-                Query
-                  { select = Cols [Col "col"],
-                    from = Table "B" Nothing,
-                    wher = Nothing,
-                    groupBy = Nothing,
-                    limit = Nothing,
-                    orderBy = Nothing
+            ( TableJoin $
+                Join
+                  { leftTable = "a",
+                    leftCol = "col",
+                    rightTable = "b",
+                    rightCol = "col",
+                    style = InnerJoin
                   }
-                Nothing
+            ),
+        P.parse fromExpP "from df1 left join df2 on df1.col1 = df2.col2"
+          ~?= Right
+            ( TableJoin $
+                Join
+                  { leftTable = "df1",
+                    leftCol = "col1",
+                    rightTable = "df2",
+                    rightCol = "col2",
+                    style = LeftJoin
+                  }
             )
+            -- P.parse fromExpP "from (select col from B)"
+            --   ~?= Right
+            --     ( SubQuery
+            --         Query
+            --           { select = Cols [Col "col"],
+            --             from = Table "B" Nothing,
+            --             wher = Nothing,
+            --             groupBy = Nothing,
+            --             limit = Nothing,
+            --             orderBy = Nothing
+            --           }
+            --         Nothing
+            --     )
       ]
 
-test_parseJoinExp :: Test
-test_parseJoinExp =
+test_joinExpP :: Test
+test_joinExpP =
   "parsing join expressions"
     ~: TestList
-      [ parseJoinExp "a join b on a.col = b.col"
+      [ P.parse joinExpP "a join b on a.col = b.col"
           ~?= Right
             ( Join
                 { leftTable = "a",
@@ -515,7 +509,7 @@ test_parseJoinExp =
                   style = InnerJoin
                 }
             ),
-        parseJoinExp "a left join b on a.col = b.col"
+        P.parse joinExpP "a left join b on a.col = b.col"
           ~?= Right
             ( Join
                 { leftTable = "a",
@@ -525,7 +519,7 @@ test_parseJoinExp =
                   style = LeftJoin
                 }
             ),
-        parseJoinExp "a right join b on a.col = b.col"
+        P.parse joinExpP "a right join b on a.col = b.col"
           ~?= Right
             ( Join
                 { leftTable = "a",
@@ -535,23 +529,23 @@ test_parseJoinExp =
                   style = RightJoin
                 }
             ),
-        parseJoinExp "a left join b"
+        P.parse joinExpP "a left join b"
           ~?= Left "No join condition specified",
-        parseJoinExp "a join b on c.col = d.col"
+        P.parse joinExpP "a join b on c.col = d.col"
           ~?= Left "Tables being JOINed != tables being selected FROM",
-        parseJoinExp "a join a on a.col = a.col"
+        P.parse joinExpP "a join a on a.col = a.col"
           ~?= Left "Can't join the same table with itself",
-        parseJoinExp "a join a on a.col = b.col"
+        P.parse joinExpP "a join a on a.col = b.col"
           ~?= Left "Can't join the same table with itself",
-        parseJoinExp "a join b"
+        P.parse joinExpP "a join b"
           ~?= Left "No join condition specified",
-        parseJoinExp "a join b on a.col = b.col arbitrarySuffix"
+        P.parse joinExpP "a join b on a.col = b.col arbitrarySuffix"
           ~?= Left "Invalid JOIN expression",
-        parseJoinExp "a invalidJoin b on a.col = b.col"
-          ~?= Left "No parses",
-        parseJoinExp "a join b on aCol = bCol"
+        P.parse joinExpP "a invalidJoin b on a.col = b.col"
+          ~?= Left "Parsing results don't satisfy predicate",
+        P.parse joinExpP "a join b on aCol = bCol"
           ~?= Left "Malformed JOIN condition",
-        parseJoinExp "a join b on c"
+        P.parse joinExpP "a join b on c"
           ~?= Left "No parses"
       ]
 

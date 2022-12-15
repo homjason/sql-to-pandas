@@ -97,11 +97,11 @@ getFnsFromSelectTranslation (cNames, mFn) = Data.Maybe.fromMaybe [] mFn
 -- JOIN expression too if present
 
 translateFromExp :: FromExp -> (TableName, Maybe Func)
-translateFromExp fromExp = case fromExp of
-  Table name mJoin -> case mJoin of
-    Nothing -> (name, Nothing)
-    Just je -> (name, Just $ translateJoinExp je)
-  SubQuery query mJoin -> undefined
+translateFromExp fromExp =
+  case fromExp of
+    Table name -> (name, Nothing)
+    TableJoin joinExp -> (leftTable joinExp, Just $ translateJoinExp joinExp)
+    SubQuery query mJoin -> undefined "TODO"
 
 getJoinFunc :: (TableName, Maybe Func) -> [Func]
 getJoinFunc (tName, f) = case f of

@@ -50,7 +50,8 @@ data ColExp
 -- Datatype for FROM clauses in SQL
 -- We can either select from a named table or from a subquery
 data FromExp
-  = Table TableName (Maybe JoinExp)
+  = Table TableName
+  | TableJoin JoinExp
   | SubQuery Query (Maybe JoinExp)
   deriving (Eq, Show)
 
