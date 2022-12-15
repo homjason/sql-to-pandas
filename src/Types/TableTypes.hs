@@ -42,8 +42,12 @@ type Row = [Maybe Value]
 type Schema = Map ColName ColType
 
 -- Permitted types for columns
-data ColType = Int | String | Double
-  deriving (Show, Eq, Enum)
+data ColType = IntC | StringC | DoubleC
+  deriving (Show, Eq)
+
+-- Data type representing a column
+data Column = IntCol [Int] | StringCol [String] | DoubleCol [Double]
+  deriving (Show, Eq)
 
 -- Allows a single column in a named table to be referenced (eg. "t.col")
 type Reference = (TableName, ColName)

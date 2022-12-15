@@ -3,10 +3,10 @@
 
 module QuickCheckTests where
 
--- import Data.Generics.Aliases (ext1Q)
-
+import Control.Monad (forM, replicateM)
 import Data.Array
 import Data.Data (Data)
+import Data.Map qualified as Map
 import Data.Maybe (isNothing)
 import Data.Set (Set)
 import Data.Set qualified as Set
@@ -22,22 +22,23 @@ import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
 
+-- TODO: fix
 -- Check that getAggCols & getNonAggCols are disjoint partitions of getColNames
 -- (helper functions called on ColExp)
-prop_getAggAndNonAggColsDisjoint :: [ColExp] -> Bool
-prop_getAggAndNonAggColsDisjoint cExps =
-  let cs = decompColExps cExps
-   in getAggCols cs `Set.union` getNonAggCols cs == getColNames cs
-        && getAggCols cs `Set.disjoint` getNonAggCols cs
+-- prop_getAggAndNonAggColsDisjoint :: [ColExp] -> Bool
+-- prop_getAggAndNonAggColsDisjoint cExps =
+--   let cs = decompColExps cExps
+--    in getAggCols cs `Set.union` getNonAggCols cs == getColNames cs
+--         && getAggCols cs `Set.disjoint` getNonAggCols cs
 
 -- TODO: fix!
-genSelectExp :: Gen SelectExp
-genSelectExp =
-  QC.oneof
-    [ Cols <$> genColName,
-      DistinctCols <$> genColName,
-      return EmptySelect
-    ]
+-- genSelectExp :: Gen SelectExp
+-- genSelectExp =
+--   QC.oneof
+--     [ Cols <$> genColName,
+--       DistinctCols <$> genColName,
+--       return EmptySelect
+--     ]
 
 genColExp :: Gen ColExp
 genColExp =
@@ -73,14 +74,15 @@ genFromExp :: Gen FromExp
 genFromExp = undefined
 
 -- Generator for WHERE expressions
-genWhereExp :: Gen WhereExp
-genWhereExp =
-  QC.oneof
-    [ OpC <$> genComparable <*> arbitrary <*> genComparable,
-      OpA <$> genComparable <*> arbitrary <*> genComparable,
-      OpL <$> arbitrary <*> arbitrary <*> arbitrary,
-      OpN <$> arbitrary <*> genColName
-    ]
+-- TODO: fix!
+-- genWhereExp :: Gen WhereExp
+-- genWhereExp =
+--   QC.oneof
+--     [ OpC <$> genComparable <*> arbitrary <*> genComparable,
+--       OpA <$> genComparable <*> arbitrary <*> genComparable,
+--       OpL <$> arbitrary <*> arbitrary <*> arbitrary,
+--       OpN <$> arbitrary <*> genColName
+--     ]
 
 -- Generator for Comparable values
 genComparable :: Gen Comparable
@@ -128,13 +130,9 @@ instance Arbitrary Query where
 genRow :: Gen Row
 genRow = undefined
 
--- | Generator for strings of length <= 10 that only contain letters a-d (from HW4)
+-- | Generator for non-empty strings of length <= 5 that only contain letters a-d (from HW4)
 genSmallString :: Gen String
-genSmallString = QC.resize 10 (QC.listOf (QC.elements "abcd"))
-
--- | Generator that produces small lists of non-empty strings
-genSmallNonEmptyStringLists :: Gen String
-genSmallNonEmptyStringLists = QC.resize 15 $ QC.listOf1 arbitrary
+genSmallString = QC.resize 5 (QC.listOf1 (QC.elements "abcd"))
 
 -- Generator for small Ints (between 0 & 5)
 genSmallInt :: Gen Int
@@ -183,36 +181,60 @@ instance Arbitrary Order where
   arbitrary = QC.arbitraryBoundedEnum
 
 -------------------------------------------------------------------------------
+
 -- Generator for Tables
 genTable :: Schema -> Gen Table
 genTable schema = do
   -- Arbitrarily generate the no. of rows
   numRows <- QC.chooseInt (1, 10)
 
+  -- List of Column generators
+  let colGenerators = map (\(colName, colType) -> genCol numRows colType) (Map.toList schema)
+
+  -- TODO: figure out how to convert colGenerators to the Table type in TableTypes.hs
+
   -- TODO: for each colname in the schema, lookup its column type
   -- Then, generate a "column" (list of a fixed length with that type)
 
-  -- TODO: change
+  -- TODO: "concatenate" the columns together to form a table
+
+  -- TODO: delete the dummy return statement below
   return $ listArray ((0, 0), (2, 2)) []
+
+-- Generates a column of a certain length
+genCol :: Int -> ColType -> Gen Column
+genCol colLen colType =
+  case colType of
+    IntC -> IntCol <$> genIntCol colLen
+    StringC -> StringCol <$> genStringCol colLen
+    DoubleC -> DoubleCol <$> genDoubleCol colLen
+  where
+    genIntCol :: Int -> Gen [Int]
+    genIntCol colLen = replicateM colLen genSmallInt
+
+    genStringCol :: Int -> Gen [String]
+    genStringCol colLen = replicateM colLen genSmallString
+
+    genDoubleCol :: Int -> Gen [Double]
+    genDoubleCol colLen = replicateM colLen genSmallDouble
 
 --------------------------------------------------------------------------------
 
 -- | Generate a small set of names for generated tests. These names are guaranteed to not include
 -- reserved words
--- genOtherTableName :: Gen TableName
--- genOtherTableName = do
---   table <-
-prop_roundtrip_val :: Value -> Bool
-prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
 
-prop_roundtrip_query :: Query -> Bool
-prop_roundtrip_query q = parseQuery (pretty q) == Right q
+-- TODO: fix!
+-- prop_roundtrip_val :: Value -> Bool
+-- prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
 
-prop_table_equality :: Query -> Bool
-prop_table_equality q = pretty (getSQLTable q) == pretty (getPandasTable (translateSQL q))
+-- prop_roundtrip_query :: Query -> Bool
+-- prop_roundtrip_query q = parseQuery (pretty q) == Right q
 
-prop_table_len :: Query -> Bool
-prop_table_len q = length (pretty (getSQLTable q)) == length (pretty (getPandasTable (translateSQL q)))
+-- prop_table_equality :: Query -> Bool
+-- prop_table_equality q = pretty (getSQLTable q) == pretty (getPandasTable (translateSQL q))
+
+-- prop_table_len :: Query -> Bool
+-- prop_table_len q = length (pretty (getSQLTable q)) == length (pretty (getPandasTable (translateSQL q)))
 
 getSQLTable :: Query -> Table
 getSQLTable = undefined
