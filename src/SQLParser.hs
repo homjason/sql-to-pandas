@@ -269,6 +269,9 @@ whereExpP = stringP "where" *> logicP
       CompVal <$> comparableP
         <|> parens logicP
 
+-- >>> P.parse whereExpP "where 1 + true"
+-- Right (CompVal (LitInt 1))
+
 -- | Parse an operator at a specified precedence level (from HW5)
 opAtLevel :: Int -> Parser (WhereExp -> WhereExp -> WhereExp)
 opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
@@ -452,6 +455,7 @@ noDistinctAndGroupBy _ Nothing = Right True
 --       Right True -> Right $ translateSQL q
 
 -------------------------------------------------------------------------------
+-- Convenience functions for constructing Query records
 
 -- | Construct a Query based on a SelectExp, FromExp & some condition
 mkQuery :: SelectExp -> FromExp -> Condition -> Query

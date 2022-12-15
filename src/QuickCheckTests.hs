@@ -3,8 +3,10 @@
 
 module QuickCheckTests where
 
-import Data.Data (Data)
 -- import Data.Generics.Aliases (ext1Q)
+
+import Data.Array
+import Data.Data (Data)
 import Data.Maybe (isNothing)
 import Data.Set (Set)
 import Data.Set qualified as Set
@@ -71,8 +73,8 @@ genFromExp :: Gen FromExp
 genFromExp = undefined
 
 -- Generator for WHERE expressions
-genBoolExp :: Gen BoolExp
-genBoolExp =
+genWhereExp :: Gen WhereExp
+genWhereExp =
   QC.oneof
     [ OpC <$> genComparable <*> arbitrary <*> genComparable,
       OpA <$> genComparable <*> arbitrary <*> genComparable,
@@ -145,7 +147,17 @@ genSmallDouble = QC.choose (0.00 :: Double, 50.00 :: Double)
 ----------------------------------------------------
 -- Arbitrary instances for Enum types
 
--- Generators for unary & binary operators
+-- Generator for Bops uses the Arbitrary instance for various binary operations
+genBop :: Gen Bop
+genBop =
+  QC.oneof
+    [ Comp <$> arbitrary,
+      Arith <$> arbitrary,
+      Logic <$> arbitrary
+    ]
+
+-- Generators for Enum types (unary & binary operators)
+-- just use QC.arbitraryBoundedEnum
 instance Arbitrary CompOp where
   arbitrary = QC.arbitraryBoundedEnum
 
@@ -155,7 +167,7 @@ instance Arbitrary ArithOp where
 instance Arbitrary LogicOp where
   arbitrary = QC.arbitraryBoundedEnum
 
-instance Arbitrary NullOp where
+instance Arbitrary Uop where
   arbitrary = QC.arbitraryBoundedEnum
 
 -- Generator for aggregate functions
@@ -170,17 +182,20 @@ instance Arbitrary JoinStyle where
 instance Arbitrary Order where
   arbitrary = QC.arbitraryBoundedEnum
 
------------------------------------------------------
--- Generators for Tables
-instance Arbitrary Table where
-  arbitrary :: Gen Table
-  arbitrary = undefined
+-------------------------------------------------------------------------------
+-- Generator for Tables
+genTable :: Schema -> Gen Table
+genTable schema = do
+  -- Arbitrarily generate the no. of rows
+  numRows <- QC.chooseInt (1, 10)
 
-  shrink :: Table -> [Table]
-  shrink = undefined
+  -- TODO: for each colname in the schema, lookup its column type
+  -- Then, generate a "column" (list of a fixed length with that type)
 
-quickCheckN :: QC.Testable prop => Int -> prop -> IO ()
-quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
+  -- TODO: change
+  return $ listArray ((0, 0), (2, 2)) []
+
+--------------------------------------------------------------------------------
 
 -- | Generate a small set of names for generated tests. These names are guaranteed to not include
 -- reserved words
@@ -221,3 +236,8 @@ getPandasTable = undefined
 -- checkTableEquality t1 t2 = Data.List.sort t1 == Data.List.sort t2
 
 -- TODO: unit tests for parsing
+
+--------------------------------------------------------------------------------
+-- Convenience functions
+quickCheckN :: QC.Testable prop => Int -> prop -> IO ()
+quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}

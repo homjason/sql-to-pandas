@@ -99,7 +99,9 @@ test_whereExpP :: Test
 test_whereExpP =
   "parsing WHERE expressions"
     ~: TestList
-      [ P.parse whereExpP "where 1 + 2"
+      [ P.parse whereExpP "where 1 + true"
+          ~?= Left "Parsing results don't satisfy predicate",
+        P.parse whereExpP "where 1 + 2"
           ~?= Right
             ( Op2
                 (CompVal (LitInt 1))
@@ -629,7 +631,38 @@ test_validateQuery =
               df
               (SQL.GroupBy ["col1", "col2"])
           )
-          ~?= Left "Columns in SELECT expression /= columns in GROUP BY"
+          ~?= Left "Columns in SELECT expression /= columns in GROUP BY",
+        validateQuery
+          (Query (Cols [Col "col1"]) (Table "df") Nothing (Just ["col1"]) Nothing Nothing)
+          ~?= Right True,
+        validateQuery
+          ( mkQuery
+              (Cols [Col "col1", Agg Count "col2"])
+              df
+              (SQL.GroupBy ["col1"])
+          )
+          ~?= Right True,
+        validateQuery
+          ( mkQuery
+              (Cols [Col "col1", Agg Count "col2"])
+              df
+              (SQL.GroupBy ["col1"])
+          )
+          ~?= Right True,
+        validateQuery
+          ( mkQuery
+              (DistinctCols [Col "col1"])
+              df
+              (SQL.GroupBy ["col1"])
+          )
+          ~?= Left "Can't have aggregate functions in SELECT DISTINCT expression",
+        validateQuery
+          ( mkQuery
+              (Cols [Col "col1"])
+              df
+              (SQL.GroupBy ["col1"])
+          )
+          ~?= Right True
       ]
   where
     df = Table "df"

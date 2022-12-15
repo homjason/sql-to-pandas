@@ -40,7 +40,11 @@ where
 
 import Control.Applicative (Alternative (..))
 import Control.Monad (guard, when)
-import Control.Monad.Error.Class
+import Control.Monad.Except
+  ( ExceptT,
+    MonadError (throwError),
+    runExceptT,
+  )
 import Data.Char
   ( Char,
     isAlpha,
@@ -137,6 +141,14 @@ filter f p = P $ \s -> do
 ---------------------------------------------------------------
 
 type ParseError = String
+
+class Monad m => MonadError e m where
+  throwError :: e -> m a
+
+-- Make Either ParseError an instance of the MoandError typeclass
+-- instance MonadError ParseError (Either ParseError) where
+--   throwError :: ParseError -> Either ParseError a
+--   throwError = Left
 
 -- | Use a parser for a particular string. Note that this parser
 -- combinator library doesn't support descriptive parse errors, but we
