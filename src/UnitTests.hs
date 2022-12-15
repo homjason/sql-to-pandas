@@ -32,16 +32,9 @@ test_comparableP =
     ~: TestList
       [ P.parse comparableP "col" ~?= Right (ColName "col"),
         P.parse comparableP "52" ~?= Right (LitInt 52),
+        P.parse comparableP "-4" ~?= Right (LitInt (-4)),
+        P.parse comparableP "100       " ~?= Right (LitInt 100),
         P.parse comparableP "\"string literal\"" ~?= Right (LitString "string literal")
-      ]
-
-test_splitOnDelims :: Test
-test_splitOnDelims =
-  "split on comma and spaces"
-    ~: TestList
-      [ splitOnDelims [",", " "] "select distinct col1, col2" ~?= ["select", "distinct", "col1", "col2"],
-        splitOnDelims [",", " "] "select" ~?= ["select"],
-        splitOnDelims [",", " "] "" ~?= []
       ]
 
 test_selectExpP :: Test
@@ -390,31 +383,27 @@ test_orderByP =
           ~?= Left "Invalid ORDER BY expression"
       ]
 
-test_parseQuerySimple :: Test
-test_parseQuerySimple =
-  "simple SQL SELECT & FROM queries"
-    ~: TestList
-      [ parseQuery "SELECT col\nFROM table"
-          ~?= Right
-            Query
-              { select = Cols [Col "col"],
-                from = Table "table" Nothing,
-                wher = Nothing,
-                groupBy = Nothing,
-                orderBy = Nothing,
-                limit = Nothing
-              }
-      ]
+-- >>> runTestTT test_parseQuery
 
 test_parseQuery :: Test
 test_parseQuery =
   "parsing SQL Queries"
     ~: TestList
-      [ parseQuery "SELECT col1\nFROM table\nLIMIT 5"
+      [ parseQuery "SELECT col\nFROM table"
+          ~?= Right
+            Query
+              { select = Cols [Col "col"],
+                from = Table "table",
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              },
+        parseQuery "SELECT col1\nFROM table\nLIMIT 5"
           ~?= Right
             Query
               { select = Cols [Col "col1"],
-                from = Table "table" Nothing,
+                from = Table "table",
                 wher = Nothing,
                 groupBy = Nothing,
                 orderBy = Nothing,
@@ -424,7 +413,7 @@ test_parseQuery =
           ~?= Right
             Query
               { select = Cols [Col "col1", Agg Count "col2"],
-                from = Table "table" Nothing,
+                from = Table "table",
                 wher = Nothing,
                 groupBy = Just ["col1"],
                 orderBy = Nothing,
@@ -434,17 +423,17 @@ test_parseQuery =
           ~?= Right
             Query
               { select = Cols [Col "col1", Agg Count "col2"],
-                from = Table "table" Nothing,
+                from = Table "table",
                 wher = Nothing,
                 groupBy = Just ["col1"],
                 orderBy = Nothing,
                 limit = Nothing
               },
-        parseQuery "SELECT col\nFROM table\nORDER BY col"
+        parseQuery "SELECT col\nFROM table\nORDER BY col ASC"
           ~?= Right
             Query
               { select = Cols [Col "col"],
-                from = Table "table" Nothing,
+                from = Table "table",
                 wher = Nothing,
                 groupBy = Nothing,
                 orderBy = Just ("col", Asc),
@@ -454,7 +443,7 @@ test_parseQuery =
           ~?= Right
             Query
               { select = Cols [Col "col", Col "col2"],
-                from = Table "table" Nothing,
+                from = Table "table",
                 wher = Just $ Op2 (CompVal $ ColName "col") (Comp Gt) (CompVal $ LitInt 4),
                 groupBy = Nothing,
                 orderBy = Nothing,
@@ -464,12 +453,23 @@ test_parseQuery =
           ~?= Right
             Query
               { select = Cols [Col "col1", Col "col2"],
-                from = Table "table1" (Just $ Join "table1" "col1" "table2" "col1" InnerJoin),
+                from = TableJoin $ Join "table1" "col1" "table2" "col1" InnerJoin,
                 wher = Nothing,
                 groupBy = Nothing,
                 orderBy = Nothing,
                 limit = Nothing
-              }
+              },
+        parseQuery "select col1 \n from table \n where col1 > 0\n group by col1 \n order by col1 asc \n limit 5"
+          ~?= Right
+            ( Query
+                { select = Cols [Col "col1"],
+                  from = Table "table",
+                  wher = Just (Op2 (CompVal (ColName "col1")) (Comp Gt) (CompVal (LitInt 0))),
+                  groupBy = Just ["col1"],
+                  orderBy = Just ("col1", Asc),
+                  limit = Just 5
+                }
+            )
       ]
 
 -- >>> runTestTT test_parseQuery
@@ -632,7 +632,7 @@ test_validateQuery =
           ~?= Left "Columns in SELECT expression /= columns in GROUP BY"
       ]
   where
-    df = Table "df" Nothing
+    df = Table "df"
 
 test_getNonAggCols :: Test
 test_getNonAggCols =
@@ -737,7 +737,7 @@ test_groupByColsInSelectExp =
           ~?= Right True
       ]
   where
-    df = Table "df" Nothing
+    df = Table "df"
 
 test_distinctHasNoAggFuncs :: Test
 test_distinctHasNoAggFuncs =
@@ -777,7 +777,7 @@ selectStarQ :: Query
 selectStarQ =
   Query
     { select = Star,
-      from = Table "df" Nothing,
+      from = Table "df",
       wher = Nothing,
       groupBy = Nothing,
       limit = Nothing,
@@ -825,8 +825,8 @@ test_translateFromExp :: Test
 test_translateFromExp =
   "translating SQL FROM to Pandas"
     ~: TestList
-      [ translateFromExp (Table "A" Nothing) ~?= ("A", Nothing),
-        translateFromExp (Table "A" (Just $ Join "A" "id" "B" "id" InnerJoin))
+      [ translateFromExp (Table "A") ~?= ("A", Nothing),
+        translateFromExp (TableJoin $ Join "A" "id" "B" "id" InnerJoin)
           ~?= ( "A",
                 Just $
                   Merge $
@@ -879,7 +879,7 @@ test_translateSQL =
       [ translateSQL
           ( Query
               { select = Cols [Col "col"],
-                from = Table "table" Nothing,
+                from = Table "table",
                 wher = Nothing,
                 groupBy = Nothing,
                 orderBy = Nothing,
@@ -894,7 +894,7 @@ test_translateSQL =
         translateSQL
           ( Query
               { select = Cols [Col "col"],
-                from = Table "table" Nothing,
+                from = Table "table",
                 wher = Nothing,
                 groupBy = Nothing,
                 orderBy = Nothing,
@@ -909,7 +909,7 @@ test_translateSQL =
         translateSQL
           ( Query
               { select = Cols [Col "col1", Agg Count "col2"],
-                from = Table "table" Nothing,
+                from = Table "table",
                 wher = Nothing,
                 groupBy = Just ["col1"],
                 orderBy = Nothing,
@@ -924,7 +924,7 @@ test_translateSQL =
         translateSQL
           ( Query
               { select = Cols [Col "col"],
-                from = Table "table" Nothing,
+                from = Table "table",
                 wher = Nothing,
                 groupBy = Nothing,
                 orderBy = Just ("col", Asc),
@@ -939,7 +939,7 @@ test_translateSQL =
         translateSQL
           ( Query
               { select = Cols [Col "col", Col "col2"],
-                from = Table "table" Nothing,
+                from = Table "table",
                 wher = Just $ Op2 (CompVal $ ColName "col") (Comp Gt) (CompVal $ LitInt 4),
                 groupBy = Nothing,
                 orderBy = Nothing,
@@ -954,7 +954,7 @@ test_translateSQL =
         translateSQL
           ( Query
               { select = Cols [Col "col1", Col "col2"],
-                from = Table "table1" (Just $ Join "table1" "col1" "table2" "col1" InnerJoin),
+                from = TableJoin (Join "table1" "col1" "table2" "col1" InnerJoin),
                 wher = Nothing,
                 groupBy = Nothing,
                 orderBy = Nothing,
@@ -984,7 +984,7 @@ test_getFuncs =
       [ getFuncs
           ( Query
               { select = Cols [Col "col"],
-                from = Table "table" Nothing,
+                from = Table "table",
                 wher = Nothing,
                 groupBy = Nothing,
                 orderBy = Nothing,
@@ -995,18 +995,18 @@ test_getFuncs =
       ]
 
 -- TODO: add more test cases for runParseAndTranslate (SQLParser.hs)
-test_runParseAndTranslate :: Test
-test_runParseAndTranslate =
-  "Testing wrapper function that takes care of Parsing + Translating"
-    ~: TestList
-      [ runParseAndTranslate "SELECT col1, COUNT(col2)\nFROM table\nGROUP BY col1"
-          ~?= Right
-            ( Command
-                "table"
-                (Just ["col1", "col2"])
-                (Just [Pandas.GroupBy ["col1"], Aggregate Count "col2"])
-            )
-      ]
+-- test_runParseAndTranslate :: Test
+-- test_runParseAndTranslate =
+--   "Testing wrapper function that takes care of Parsing + Translating"
+--     ~: TestList
+--       [ runParseAndTranslate "SELECT col1, COUNT(col2)\nFROM table\nGROUP BY col1"
+--           ~?= Right
+--             ( Command
+--                 "table"
+--                 (Just ["col1", "col2"])
+--                 (Just [Pandas.GroupBy ["col1"], Aggregate Count "col2"])
+--             )
+--       ]
 
 --------------------------------------------------------------------------------
 -- PRINT unit tests

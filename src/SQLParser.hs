@@ -99,17 +99,6 @@ reserved =
     "intersect"
   ]
 
--- Parses literal values (ints, booleans, strings, doubles)
--- valueP :: Parser Value
--- valueP = intValP <|> boolValP <|> stringValP <|> doubleValP
-
--- Parses positive / negative integer literals
-litIntP :: Parser Comparable
-litIntP = LitInt <$> wsP P.int
-
-boolValP :: Parser Value
-boolValP = BoolVal <$> (constP "true" True <|> constP "false" False)
-
 strToDouble :: String -> Double
 strToDouble = read :: String -> Double
 
@@ -132,40 +121,17 @@ selectTokenP = stringP "select"
 selectDistinctTokenP :: Parser ()
 selectDistinctTokenP = stringP "select distinct"
 
--- | Parses the names of aggregate functions and returns a function from ColName -> ColExp
-aggFuncTokenP :: Parser (ColName -> ColExp)
-aggFuncTokenP =
-  constP "count" (Agg Count)
-    <|> constP "avg" (Agg Avg)
-    <|> constP "sum" (Agg Sum)
-    <|> constP "min" (Agg Min)
-    <|> constP "max" (Agg Max)
-
 -- | Names of aggregate functions in SQL/Pandas
 aggFuncNames :: [String]
 aggFuncNames = ["count", "avg", "sum", "min", "max"]
-
--- | Parses aggregate function names in SQL
-aggFuncP :: Parser AggFunc
-aggFuncP =
-  P.choice
-    [ constP "count" Count,
-      constP "avg" Avg,
-      constP "sum" Sum,
-      constP "min" Min,
-      constP "max" Max
-    ]
-
--- | Strips leading/trailing whitespace from a string
-stripSpace :: String -> String
-stripSpace = dropWhileEnd isSpace . dropWhile isSpace
 
 -- | Parses SELECT expressions
 selectExpP :: Parser SelectExp
 selectExpP =
   P.choice
     [ selectTokenP *> (Cols <$> P.sepBy1 colExpP (stringP ",")),
-      selectDistinctTokenP *> (DistinctCols <$> P.sepBy1 colExpP (stringP ","))
+      selectDistinctTokenP *> (DistinctCols <$> P.sepBy1 colExpP (stringP ",")),
+      selectTokenP *> stringP "*" $> Star
     ]
 
 -- | Parser for column expressions (parses either a colname
@@ -174,6 +140,17 @@ colExpP :: Parser ColExp
 colExpP =
   Agg <$> aggFuncP <*> parens colnameP
     <|> Col <$> colnameP
+  where
+    -- Parses aggregate function names in SQL
+    aggFuncP :: Parser AggFunc
+    aggFuncP =
+      P.choice
+        [ constP "count" Count,
+          constP "avg" Avg,
+          constP "sum" Sum,
+          constP "min" Min,
+          constP "max" Max
+        ]
 
 -- | Auxiliary parser that ensures that colnames aren't reserved keywords
 -- (also called in groupByExpP)
@@ -327,20 +304,20 @@ uopP =
       constP "is not null" IsNotNull
     ]
 
--- | Parses string literals
--- (non-quote characters enclosed in-between escaped double quotes)
-litStringP :: Parser String
-litStringP = P.between (P.char '\"') (many $ P.satisfy (/= '\"')) (stringP "\"")
-
 -- | Parser for Comparable values
 -- TODO: handle LitDouble
 comparableP :: Parser Comparable
 comparableP =
   P.choice
     [ ColName <$> nameP,
-      LitInt <$> P.int,
+      LitInt <$> wsP P.int,
       LitString <$> litStringP
     ]
+  where
+    -- Parses string literals
+    -- (non-quote characters enclosed in-between escaped double quotes)
+    litStringP :: Parser String
+    litStringP = P.between (P.char '\"') (many $ P.satisfy (/= '\"')) (stringP "\"")
 
 -- | Parse GROUP BY expressions
 groupByP :: Parser [ColName]
@@ -366,127 +343,19 @@ limitP = stringP "limit" *> P.int
 parseLimitExp :: String -> Either P.ParseError Int
 parseLimitExp = P.parse limitP
 
--- TODO: In the function inferCondition, use alternative instead of nested cases
--- (change return type of ParseGroupByExp, parseOrderByExp etc. to
--- Parser a instead of using Either monad)
+-- | Overall parser for a SQL query
+queryP :: Parser Query
+queryP =
+  Query <$> selectExpP
+    <*> fromExpP
+    <*> ((whereExpP <&> Just) <|> pure Nothing)
+    <*> ((groupByP <&> Just) <|> pure Nothing)
+    <*> ((orderByP <&> Just) <|> pure Nothing)
+    <*> ((limitP <&> Just) <|> pure Nothing)
 
--- | Infers whether a query condition is a WHERE, a GROUP BY,
--- an ORDER BY or a LIMIT
--- inferCondition :: String -> Either P.ParseError Condition
--- inferCondition str =
---   case parseWhereExp str of
---     Right whereExp -> Right $ Wher whereExp
---     Left e1 ->
---       case parseGroupByExp str of
---         Right groupByCols -> Right $ SQL.GroupBy groupByCols
---         Left e2 ->
---           case parseOrderByExp str of
---             Right orderByExp -> Right $ OrderBy orderByExp
---             Left e3 ->
---               case parseLimitExp str of
---                 Right numRows -> Right $ Limit numRows
---                 Left e4 -> Left "Malformed SQL query"
-
--- | Construct a Query based on a SelectExp, FromExp & some condition
-mkQuery :: SelectExp -> FromExp -> Condition -> Query
-mkQuery s f condition =
-  case condition of
-    Wher w -> Query s f (Just w) Nothing Nothing Nothing
-    SQL.GroupBy gb -> Query s f Nothing (Just gb) Nothing Nothing
-    OrderBy ob -> Query s f Nothing Nothing (Just ob) Nothing
-    Limit l -> Query s f Nothing Nothing Nothing (Just l)
-
--- | Construct a Query based on a SelectExp, FromExp & two conditions
--- Returns a ParseError if the two conditions are invalid / in the wrong order
-mkQuery2 :: SelectExp -> FromExp -> Condition -> Condition -> Either P.ParseError Query
-mkQuery2 s f c1 c2 =
-  case (c1, c2) of
-    (Wher w, SQL.GroupBy gb) -> Right $ Query s f (Just w) (Just gb) Nothing Nothing
-    (Wher w, OrderBy ob) -> Right $ Query s f (Just w) Nothing (Just ob) Nothing
-    (Wher w, Limit l) -> Right $ Query s f (Just w) Nothing Nothing (Just l)
-    (SQL.GroupBy gb, OrderBy ob) -> Right $ Query s f Nothing (Just gb) (Just ob) Nothing
-    (SQL.GroupBy gb, Limit l) -> Right $ Query s f Nothing (Just gb) Nothing (Just l)
-    (OrderBy o, Limit l) -> Right $ Query s f Nothing Nothing (Just o) (Just l)
-    (_, _) -> Left "Malformed SQL query, couldn't infer query conditions"
-
--- | Construct a Query based on a SelectExp, FromExp & three conditions
--- Returns a ParseError if the two conditions are invalid / in the wrong order
-mkQuery3 ::
-  SelectExp ->
-  FromExp ->
-  Condition ->
-  Condition ->
-  Condition ->
-  Either P.ParseError Query
-mkQuery3 s f c1 c2 c3 =
-  case (c1, c2, c3) of
-    (Wher w, SQL.GroupBy gb, OrderBy ob) ->
-      Right $ Query s f (Just w) (Just gb) (Just ob) Nothing
-    (Wher w, OrderBy ob, Limit l) ->
-      Right $ Query s f (Just w) Nothing (Just ob) (Just l)
-    (SQL.GroupBy gb, OrderBy ob, Limit l) ->
-      Right $ Query s f Nothing (Just gb) (Just ob) (Just l)
-    (_, _, _) -> Left "Malformed SQL query, couldn't infer query conditions"
-
--- | Wrapper function for all the query-parsing business logic
--- s = SELECT expression
--- f = FROM expression
--- w = WHERE expression
--- gb = GROUP BY expression
--- ob = ORDER BY expression
--- l = LIMIT expression
--- c = Arbitrary SQL query condition (WHERE/GROUP BY/ORDER BY/LIMIT)
--- parseQuery :: String -> Either P.ParseError Query
--- parseQuery str =
---   case splitQueryString str of
---     [] -> Left "No parses"
---     [select, from] -> do
---       s <- parseSelectExp select
---       f <- parseFromExp from
---       Right $ Query s f Nothing Nothing Nothing Nothing
---     [select, from, c] -> do
---       s <- parseSelectExp select
---       f <- parseFromExp from
---       case inferCondition c of
---         Left errorMsg -> Left errorMsg
---         Right c' -> Right $ mkQuery s f c'
---     [select, from, c1, c2] -> do
---       s <- parseSelectExp select
---       f <- parseFromExp from
---       case (inferCondition c1, inferCondition c2) of
---         (Right w@(Wher _), Right gb@(SQL.GroupBy _)) -> mkQuery2 s f w gb
---         (Right w@(Wher _), Right ob@(OrderBy _)) -> mkQuery2 s f w ob
---         (Right w@(Wher _), Right l@(Limit _)) -> mkQuery2 s f w l
---         (Right gb@(SQL.GroupBy _), Right ob@(OrderBy _)) -> mkQuery2 s f gb ob
---         (Right gb@(SQL.GroupBy _), Right l@(Limit _)) -> mkQuery2 s f gb l
---         (Right ob@(OrderBy _), Right l@(Limit _)) -> mkQuery2 s f ob l
---         (_, _) -> Left "Malformed SQL query"
---     [select, from, c1, c2, c3] -> do
---       s <- parseSelectExp select
---       f <- parseFromExp from
---       case (inferCondition c1, inferCondition c2, inferCondition c3) of
---         (Right w@(Wher _), Right gb@(SQL.GroupBy _), Right ob@(OrderBy _)) ->
---           mkQuery3 s f w gb ob
---         (Right w@(Wher _), Right ob@(OrderBy _), Right l@(Limit _)) ->
---           mkQuery3 s f w ob l
---         (Right gb@(SQL.GroupBy _), Right ob@(OrderBy _), Right l@(Limit _)) ->
---           mkQuery3 s f gb ob l
---         (_, _, _) -> Left "Malformed SQL query"
---     [select, from, wher, groupBy, orderBy, limit] -> do
---       s <- parseSelectExp select
---       f <- parseFromExp from
---       w <- parseWhereExp wher
---       gb <- parseGroupByExp groupBy
---       ob <- parseOrderByExp orderBy
---       l <- parseLimitExp limit
---       Right $ Query s f (Just w) (Just gb) (Just ob) (Just l)
---     _ -> Left "Invalid SQL Query"
-
--- Converts query string to lower case, splits on newlines
--- & strips leading/trailing whitespace
--- NB: each clause in a SQL query (SELECT, FROM, etc.) must be on a new line
-splitQueryString :: String -> [String]
-splitQueryString = map stripSpace . lines . map toLower
+-- | Wrapper function for parsing a string as a SQL query
+parseQuery :: String -> Either P.ParseError Query
+parseQuery str = P.parse queryP (map toLower str)
 
 -- Parses a SQL file (takes in filename of the SQL file)
 -- Returns either a ParseError (Left) or a Query (Right)
@@ -581,3 +450,46 @@ noDistinctAndGroupBy _ Nothing = Right True
 --       Left validateError -> Left validateError
 --       Right False -> Left "Invalid SQL query"
 --       Right True -> Right $ translateSQL q
+
+-------------------------------------------------------------------------------
+
+-- | Construct a Query based on a SelectExp, FromExp & some condition
+mkQuery :: SelectExp -> FromExp -> Condition -> Query
+mkQuery s f condition =
+  case condition of
+    Wher w -> Query s f (Just w) Nothing Nothing Nothing
+    SQL.GroupBy gb -> Query s f Nothing (Just gb) Nothing Nothing
+    OrderBy ob -> Query s f Nothing Nothing (Just ob) Nothing
+    Limit l -> Query s f Nothing Nothing Nothing (Just l)
+
+-- | Construct a Query based on a SelectExp, FromExp & two conditions
+-- Returns a ParseError if the two conditions are invalid / in the wrong order
+mkQuery2 :: SelectExp -> FromExp -> Condition -> Condition -> Either P.ParseError Query
+mkQuery2 s f c1 c2 =
+  case (c1, c2) of
+    (Wher w, SQL.GroupBy gb) -> Right $ Query s f (Just w) (Just gb) Nothing Nothing
+    (Wher w, OrderBy ob) -> Right $ Query s f (Just w) Nothing (Just ob) Nothing
+    (Wher w, Limit l) -> Right $ Query s f (Just w) Nothing Nothing (Just l)
+    (SQL.GroupBy gb, OrderBy ob) -> Right $ Query s f Nothing (Just gb) (Just ob) Nothing
+    (SQL.GroupBy gb, Limit l) -> Right $ Query s f Nothing (Just gb) Nothing (Just l)
+    (OrderBy o, Limit l) -> Right $ Query s f Nothing Nothing (Just o) (Just l)
+    (_, _) -> Left "Malformed SQL query, couldn't infer query conditions"
+
+-- | Construct a Query based on a SelectExp, FromExp & three conditions
+-- Returns a ParseError if the two conditions are invalid / in the wrong order
+mkQuery3 ::
+  SelectExp ->
+  FromExp ->
+  Condition ->
+  Condition ->
+  Condition ->
+  Either P.ParseError Query
+mkQuery3 s f c1 c2 c3 =
+  case (c1, c2, c3) of
+    (Wher w, SQL.GroupBy gb, OrderBy ob) ->
+      Right $ Query s f (Just w) (Just gb) (Just ob) Nothing
+    (Wher w, OrderBy ob, Limit l) ->
+      Right $ Query s f (Just w) Nothing (Just ob) (Just l)
+    (SQL.GroupBy gb, OrderBy ob, Limit l) ->
+      Right $ Query s f Nothing (Just gb) (Just ob) (Just l)
+    (_, _, _) -> Left "Malformed SQL query, couldn't infer query conditions"
