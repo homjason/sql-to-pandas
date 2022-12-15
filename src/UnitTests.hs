@@ -71,20 +71,35 @@ test_colExpP =
         P.parse colExpP "count(col2)" ~?= Right (Agg Count "col2"),
         -- Check that the names of aggregate functions are
         -- reserved keywords and can't be used as colnames
-        P.parse colExpP "max" ~?= Left "No parses",
-        P.parse colExpP "min" ~?= Left "No parses",
-        P.parse colExpP "avg" ~?= Left "No parses",
-        P.parse colExpP "sum" ~?= Left "No parses",
-        P.parse colExpP "count" ~?= Left "No parses",
-        P.parse colExpP "max(max)" ~?= Left "No parses",
-        P.parse colExpP "count(count)" ~?= Left "No parses",
+        P.parse colExpP "max"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "min"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "avg"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "sum"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "count"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "max(max)"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "count(count)"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "select col1, max(max), col3"
+          ~?= Left selectErrorMsg,
         -- No column specified in aggregate function
-        P.parse colExpP "sum()" ~?= Left "No parses",
-        P.parse colExpP "min(" ~?= Left "No parses",
+        P.parse colExpP "sum()"
+          ~?= Left selectErrorMsg,
+        P.parse colExpP "min("
+          ~?= Left selectErrorMsg,
         -- Invalid function calls
         P.parse colExpP "dsgds(col)" ~?= Left "no parses",
         P.parse colExpP "col(col)" ~?= Left "no parses"
       ]
+  where
+    selectErrorMsg =
+      "Colnames must be non-empty and not \
+      \SQL reserved keywords"
 
 -- TODO: fix failing test cases
 test_whereExpP :: Test
@@ -341,29 +356,38 @@ test_whereExpP =
       ]
 
 -- GROUP BY Expression Tests
-test_parseGroupByExp :: Test
-test_parseGroupByExp =
+test_groupByP :: Test
+test_groupByP =
   "parsing GROUP BY expressions"
     ~: TestList
-      [ parseGroupByExp "group by col1" ~?= Right ["col1"],
-        parseGroupByExp "group by col1, col2" ~?= Right ["col1", "col2"],
-        parseGroupByExp "group by" ~?= Left "No columns selected to Group By",
-        parseGroupByExp "hello world" ~?= Left "No parses"
+      [ P.parse groupByP "group by col1" ~?= Right ["col1"],
+        P.parse groupByP "group by col1, col2" ~?= Right ["col1", "col2"],
+        P.parse groupByP "group by" ~?= Left "Colnames must be non-empty and not SQL reserved keywords",
+        P.parse groupByP "hello world" ~?= Left "Parsing results don't satisfy predicate"
       ]
 
-test_parseOrderByExp :: Test
-test_parseOrderByExp =
+test_orderByP :: Test
+test_orderByP =
   "parsing ORDER BY clauses"
     ~: TestList
-      [ parseOrderByExp "arbitrary_string" ~?= Left "no parses",
-        parseOrderByExp "order by" ~?= Left "Error: incomplete Order By expression",
-        parseOrderByExp "order by col0" ~?= Right ("col0", Asc),
-        parseOrderByExp "order by col2 asc" ~?= Right ("col2", Asc),
-        parseOrderByExp "order by col1 desc" ~?= Right ("col1", Desc),
-        parseOrderByExp "order by col1 wrongOrder" ~?= Left "Error: invalid sort order",
-        parseOrderByExp "order by nonexistentCol wrongOrder" ~?= Left "Error: invalid sort order",
-        parseOrderByExp "order by col1, col2 asc" ~?= Left "Error: too many tokens in Order By expression",
-        parseOrderByExp "order by col1, col2, col3 desc" ~?= Left "Error: too many tokens in Order By expression"
+      [ P.parse orderByP "arbitrary_string"
+          ~?= Left "Parsing results don't satisfy predicate",
+        P.parse orderByP "order by"
+          ~?= Left "Invalid ORDER BY expression",
+        P.parse orderByP "order by col0"
+          ~?= Left "Invalid ORDER BY expression",
+        P.parse orderByP "order by col2 asc"
+          ~?= Right ("col2", Asc),
+        P.parse orderByP "order by col1 desc"
+          ~?= Right ("col1", Desc),
+        P.parse orderByP "order by col1 wrongOrder"
+          ~?= Left "Invalid ORDER BY expression",
+        P.parse orderByP "order by nonexistentCol wrongOrder"
+          ~?= Left "Invalid ORDER BY expression",
+        P.parse orderByP "order by col1, col2 asc"
+          ~?= Left "Invalid ORDER BY expression",
+        P.parse orderByP "order by col1, col2, col3 desc"
+          ~?= Left "Invalid ORDER BY expression"
       ]
 
 test_parseQuerySimple :: Test

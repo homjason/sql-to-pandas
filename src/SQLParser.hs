@@ -174,14 +174,16 @@ colExpP :: Parser ColExp
 colExpP =
   Agg <$> aggFuncP <*> parens colnameP
     <|> Col <$> colnameP
-  where
-    colnameP :: Parser ColName
-    colnameP =
-      P.setErrorMsg
-        (P.filter (`notElem` aggFuncNames) nameP)
-        "Invalid SELECT expression, make sure colnames are non-empty and are not SQL reserved keywords"
 
--- Copied over unit tests to this file for the time being
+-- | Auxiliary parser that ensures that colnames aren't reserved keywords
+-- (also called in groupByExpP)
+colnameP :: Parser ColName
+colnameP =
+  P.setErrorMsg
+    (P.filter (`notElem` aggFuncNames) nameP)
+    "Colnames must be non-empty and not SQL reserved keywords"
+
+-- Copied over colExpP unit tests to this file for the time being
 -- TODO: fix the two failing test cases
 test_colExpP :: Test
 test_colExpP =
@@ -221,20 +223,8 @@ test_colExpP =
       ]
   where
     selectErrorMsg =
-      "Invalid SELECT expression, make sure colnames \
-      \are non-empty and are not SQL reserved keywords"
-
--- | Parses the token "from", consumes subsequent whitespace
-fromTokenP :: Parser ()
-fromTokenP = stringP "from"
-
--- | Parses the token "on", consumes subsequent whitespace
-onTokenP :: Parser ()
-onTokenP = stringP "on"
-
--- | Parses the equal sign
-eqTokenP :: Parser ()
-eqTokenP = stringP "="
+      "Colnames must be non-empty and not \
+      \SQL reserved keywords"
 
 -- | Parses commands indicating the style of the join
 joinTokenP :: Parser JoinStyle
@@ -248,8 +238,8 @@ joinTokenP =
 fromExpP :: Parser FromExp
 fromExpP =
   P.choice
-    [ fromTokenP *> (TableJoin <$> joinExpP),
-      fromTokenP *> (Table <$> nameP)
+    [ stringP "from" *> (TableJoin <$> joinExpP),
+      stringP "from" *> (Table <$> nameP)
     ]
 
 -- | Parses JOIN expressions
@@ -261,8 +251,8 @@ joinExpP = P.mkParser $ \str -> do
   (joinStyle, s'') <- parseResult joinTokenP s'
   (rightT, joinCond) <- parseResult nameP s''
   when (null joinCond) (Left "No join condition specified")
-  (leftTC, remainder) <- parseResult (onTokenP *> nameP) joinCond
-  (rightTC, tl) <- parseResult (eqTokenP *> nameP) remainder
+  (leftTC, remainder) <- parseResult (stringP "on" *> nameP) joinCond
+  (rightTC, tl) <- parseResult (stringP "=" *> nameP) remainder
   unless (null tl) (Left "Invalid JOIN expression")
   case (splitOn "." leftTC, splitOn "." rightTC) of
     ([leftT', leftC], [rightT', rightC]) -> do
@@ -284,16 +274,12 @@ joinExpP = P.mkParser $ \str -> do
         )
     (_, _) -> Left "Malformed JOIN condition"
 
--- | Parses the string "where" & consumes subsequent whitespace
-whereTokenP :: Parser ()
-whereTokenP = stringP "where"
-
 -- | Parse WHERE expressions (binary/unary operators are left associative)
 -- (modified from HW5)
 -- We first parse AND/OR operators, then comparison operators,
 -- then + & -, then * & /, then (postfix) unary operators
 whereExpP :: Parser WhereExp
-whereExpP = whereTokenP *> logicP
+whereExpP = stringP "where" *> logicP
   where
     logicP = compP `P.chainl1` opAtLevel (level (Logic And))
     compP = sumP `P.chainl1` opAtLevel (level (Comp Gt))
@@ -356,45 +342,21 @@ comparableP =
       LitString <$> litStringP
     ]
 
-groupByTokenP :: Parser ()
-groupByTokenP = stringP "group by"
+-- | Parse GROUP BY expressions
+groupByP :: Parser [ColName]
+groupByP = stringP "group by" *> P.sepBy1 colnameP (stringP ",")
 
--- TODO: rewrite using Parser
--- Parse GROUP BY expressions
--- parseGroupByExp :: String -> Either P.ParseError [ColName]
--- parseGroupByExp str = case P.doParse groupByTokenP str of
---   Nothing -> Left "No parses"
---   Just ((), remainderStr) ->
---     let cols = map stripSpace (splitOnDelims [",", " "] remainderStr)
---      in case cols of
---           [] -> Left "No columns selected in Group By"
---           hd : tl -> Right cols
-
-orderByTokenP :: Parser ()
-orderByTokenP = stringP "order by"
-
--- Parse ORDER BY expressions
--- Note: we specify that we can only sort by one column
--- parseOrderByExp :: String -> Either P.ParseError (ColName, Order)
--- parseOrderByExp str =
---   case P.doParse orderByTokenP str of
---     Left _ -> Left "no parses"
---     Right ((), remainder) ->
---       let orderByExp = map stripSpace (splitOnDelims [",", " "] remainder)
---        in case orderByExp of
---             [] -> Left "Incomplete Order By expression"
---             [col] -> Right (col, Asc)
---             [col, order] ->
---               case stringToOrder order of
---                 Just ord -> Right (col, ord)
---                 Nothing -> Left "Error: invalid sort order"
---             _ -> Left "Too many tokens in Order By expression"
-
--- Helper function: converts a string representing a sort order to an Order
-stringToOrder :: String -> Maybe Order
-stringToOrder "asc" = Just Asc
-stringToOrder "desc" = Just Desc
-stringToOrder _ = Nothing
+-- | Parse ORDER BY expressions
+-- We stipulate that the query must specify the sort order (ASC or DESC)
+orderByP :: Parser (ColName, Order)
+orderByP =
+  stringP "order by"
+    *> P.setErrorMsg
+      (liftA2 (,) nameP orderP)
+      "Invalid ORDER BY expression"
+  where
+    orderP :: Parser Order
+    orderP = constP "asc" Asc <|> constP "desc" Desc
 
 -- Parser for limit expressions (consumes subsequent whitespace)
 limitP :: Parser Int
