@@ -4,6 +4,9 @@
 
 module QuickCheckTests where
 
+-- TOOD: look at error instance for QC
+-- no need to do install importance
+
 import Control.Monad
 import Data.Array
 import Data.Data (Data)
@@ -64,12 +67,23 @@ genFromExp =
 
 -- Generator for WHERE expressions
 genWhereExp :: Gen WhereExp
-genWhereExp =
-  QC.oneof
-    [ liftM2 Op1 genWhereExp arbitrary,
-      liftM3 Op2 genWhereExp genBop genWhereExp,
-      CompVal <$> genComparable
-    ]
+genWhereExp = QC.sized aux
+  where
+    aux 0 = CompVal <$> genComparable
+    aux n =
+      QC.oneof
+        [ liftM2 Op1 (aux (n - 1)) arbitrary,
+          liftM3 Op2 (aux (n - 1)) genBop (aux (n - 1)),
+          CompVal <$> genComparable
+        ]
+
+-- Implementation of QC.listOf (from meeting with Joe)
+-- TODO: delete
+genList :: Gen a -> Gen [a]
+genList g = QC.sized aux
+  where
+    aux 0 = pure []
+    aux n = (:) <$> g <*> aux (n `div` 2)
 
 -- Generator for Comparable values
 genComparable :: Gen Comparable
@@ -86,7 +100,7 @@ instance Arbitrary JoinExp where
   arbitrary = do
     leftTable <- genTableName
     leftCol <- genColName
-    rightTable <- genTableName
+    rightTable <- genTableName `QC.suchThat` (/= leftTable)
     rightCol <- genColName
     style <- arbitrary
     return $
@@ -197,15 +211,24 @@ genTable schema = do
   -- type annotations for let bindings (for ease of readability)
   let colToIdx = getColIdxs schema :: Map ColName Int
 
-  let idxToCol = invertMap colToIdx :: Map Int ColName
-
   -- colToGenerator :: Map ColName (Gen Column)
   let colToGenerator = Map.mapWithKey (\colName colType -> genCol numRows colType) schema
 
   -- idxToGenerator :: Map Int (Gen Column)
   let idxToGenerator = colToGenerator `Map.compose` idxToCol
+    where 
+      -- idxToCol :: Map Int ColName
+      idxToCol = invertMap colToIdx 
 
-  -- TODO: "concatenate" the columns together to form a table
+
+  -- THIS IS THE STUFF JOE ADDED
+  -- colMap :: Map Int Column
+  colMap <- sequence idxToGenerator -- :: Gen (Map Int Column)
+
+  
+
+  -- Then do some indexing math to generate a list of [Maybe Values]
+  -- Then call listArray (from Data.Array) to turn that list into a table
 
   -- TODO: delete the dummy return statement below
   return $ listArray ((0, 0), (2, 2)) []
