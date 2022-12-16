@@ -3,6 +3,7 @@ module Print where
 
 import Control.Monad (mapM_)
 import Data.Char qualified as Char
+import Data.List
 import Data.Map (Map)
 import Data.Map qualified as Map
 import Test.HUnit
@@ -30,6 +31,9 @@ pretty = PP.render . pp
 oneLine :: PP a => a -> String
 oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
 
+{-
+  Pretty printing for Pandas Commands
+-}
 convertOrdToBool :: Order -> Bool
 convertOrdToBool o = o == Asc
 
@@ -46,21 +50,20 @@ mapJoinStyleToPandasSyntax js = case js of
 
 -- TODO: define instances of the PP typeclass
 -- (eg. PP for binary / unary operators, etc.)
-instance PP Pandas.Func where
-  -- pp (DropDuplicates colNames) =
-  --   case colNames of
-  --     Nothing -> PP.text ".drop_duplicates()"
-  --     Just ss -> PP.text (".drop_duplicates(subset=" ++ show ss ++ "))")
-  -- QUESTION FOR JOE: How to incorporate list of strings in pretty printing? (are there f-strings in Haskell?)
-  pp (Pandas.SortValues cName o) = PP.text (".sort_values(by=[\"" ++ show cName ++ "\"], ascending=" ++ show (convertOrdToBool o) ++ ")")
-  pp (Pandas.Rename colNameMap) = undefined
-  pp (Pandas.GroupBy colNames) = PP.text (".groupBy(by=" ++ show colNames ++ ")")
-  pp (Pandas.Aggregate fn col) = undefined
-  pp (Pandas.Loc whereExp) = undefined
-  pp (Pandas.Merge mergeExp) = pp mergeExp
-  pp (Pandas.Unique colNames) = PP.text (".drop_duplicates(subset=" ++ show colNames ++ ")")
-  pp (Pandas.Head n) = PP.text (".head(" ++ show n ++ ")")
-  pp Pandas.ResetIndex = PP.text ".reset_index()"
+-- instance PP Pandas.Func where
+-- pp (DropDuplicates colNames) =
+--   case colNames of
+--     Nothing -> PP.text ".drop_duplicates()"
+--     Just ss -> PP.text (".drop_duplicates(subset=" ++ show ss ++ "))")
+-- pp (Pandas.SortValues cName o) = PP.text (".sort_values(by=[\"" ++ show cName ++ "\"], ascending=" ++ show (convertOrdToBool o) ++ ")")
+-- pp (Pandas.Rename colNameMap) = undefined
+-- pp (Pandas.GroupBy colNames) = PP.text (".groupBy(by=" ++ show colNames ++ ")")
+-- pp (Pandas.Aggregate fn col) = undefined
+-- pp (Pandas.Loc whereExp) = undefined
+-- pp (Pandas.Merge mergeExp) = pp mergeExp
+-- pp (Pandas.Unique colNames) = PP.text (".drop_duplicates(subset=" ++ show colNames ++ ")")
+-- pp (Pandas.Head n) = PP.text (".head(" ++ show n ++ ")")
+-- pp Pandas.ResetIndex = PP.text ".reset_index()"
 
 printFn :: Pandas.Func -> String
 printFn (Pandas.SortValues cName o) = ".sort_values(by=[" ++ show cName ++ "], ascending=" ++ show (convertOrdToBool o) ++ ")"
@@ -104,6 +107,45 @@ instance PP Pandas.Command where
 -- >>> pp (Pandas.Command "table" (Just ["col"]) (Just [Pandas.SortValues "col" Asc]))
 -- table["col"].sort_values(by=["col"], ascending=True)
 
+{-
+  Pretty printing for SQL Queries. This will be used for QuickCheck testing
+-}
+instance PP Query where
+  pp = undefined
+
+listToDoc :: [ColExp] -> Doc
+listToDoc cExps = case cExps of
+  [] -> PP.empty
+  hd : tl -> pp hd <> PP.text ", " <> listToDoc tl
+
+instance PP SelectExp where
+  -- pp (Cols cExps) = PP.text $ "SELECT " <> show (map pp cExps)
+  pp (Cols cExps) = PP.text $ "SELECT " <> tail (init (show (map pp cExps)))
+  -- pp (Cols cExps) = PP.text $ "SELECT " <> foldr (\x acc -> acc ++ pp x ++ PP.text ", ") PP.empty cExps
+  -- pp (Cols cExps) = PP.text "SELECT " <> listToDoc cExps
+  -- pp (Cols cExps) = PP.text "SELECT " <> intercalate ", " ((map (show . pp) cExps))
+  pp (DistinctCols cExps) = undefined
+  pp Star = undefined
+
+instance PP ColExp where
+  pp (Col cName) = PP.text cName
+  pp (Agg fn cName) = PP.text $ lowerAggName (show fn) <> "(" <> cName <> ")"
+
+-- colExpToString :: ColExp -> String
+--   colExpToString (Col cName) = cName
+--   colExpToString (Agg fn cName) = lowerAggName (show fn) <> "(" <> cName <> ")"
+
+-- >>> pp (Cols [Col "col1", Col "col2", Col "col3", Col "col4", Col "col5"])
+-- SELECT col1,col2,col3,col4,col5
+
+{-
+data ColExp
+  = Col ColName
+  | Agg AggFunc ColName -- Aggregate functions (used with GROUP BY clauses)
+  deriving
+    (Eq, Show)
+-}
+
 instance PP Row where
   pp = undefined
 
@@ -111,7 +153,4 @@ instance PP Table where
   pp = undefined
 
 instance PP Value where
-  pp = undefined
-
-instance PP Query where
   pp = undefined
