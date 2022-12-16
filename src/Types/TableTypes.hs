@@ -46,7 +46,10 @@ data ColType = IntC | StringC | DoubleC
   deriving (Show, Eq)
 
 -- Data type representing a column
-data Column = IntCol [Int] | StringCol [String] | DoubleCol [Double]
+data Column
+  = IntCol [Maybe Int]
+  | StringCol [Maybe String]
+  | DoubleCol [Maybe Double]
   deriving (Show, Eq)
 
 -- Allows a single column in a named table to be referenced (eg. "t.col")

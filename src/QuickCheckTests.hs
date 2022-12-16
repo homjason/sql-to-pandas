@@ -183,6 +183,7 @@ instance Arbitrary Order where
 -------------------------------------------------------------------------------
 
 -- Generator for Tables
+-- TODO: figure out how to generate Maybe values using QC.frequency
 genTable :: Schema -> Gen Table
 genTable schema = do
   -- Arbitrarily generate the no. of rows
@@ -201,7 +202,8 @@ genTable schema = do
   -- TODO: delete the dummy return statement below
   return $ listArray ((0, 0), (2, 2)) []
 
--- Generates a column of a certain length
+-- Generates a column of a fixed length containing
+-- Maybe values of a particular type (for 1/7 of the time, we generate Nothing)
 genCol :: Int -> ColType -> Gen Column
 genCol colLen colType =
   case colType of
@@ -209,15 +211,38 @@ genCol colLen colType =
     StringC -> StringCol <$> genStringCol colLen
     DoubleC -> DoubleCol <$> genDoubleCol colLen
   where
-    genIntCol :: Int -> Gen [Int]
-    genIntCol colLen = replicateM colLen genSmallInt
+    genIntCol :: Int -> Gen [Maybe Int]
+    genIntCol colLen =
+      QC.vectorOf
+        colLen
+        ( QC.frequency
+            [ (1, return Nothing),
+              (7, Just <$> genSmallInt)
+            ]
+        )
 
-    genStringCol :: Int -> Gen [String]
-    genStringCol colLen = replicateM colLen genSmallString
+    genStringCol :: Int -> Gen [Maybe String]
+    genStringCol colLen =
+      QC.vectorOf
+        colLen
+        ( QC.frequency
+            [ (1, return Nothing),
+              (7, Just <$> genSmallString)
+            ]
+        )
 
-    genDoubleCol :: Int -> Gen [Double]
-    genDoubleCol colLen = replicateM colLen genSmallDouble
+    genDoubleCol :: Int -> Gen [Maybe Double]
+    genDoubleCol colLen =
+      QC.vectorOf
+        colLen
+        ( QC.frequency
+            [ (1, return Nothing),
+              (7, Just <$> genSmallDouble)
+            ]
+        )
 
+-- >>> QC.sample' (genCol 5 IntC)
+-- [IntCol [Just 3,Just 3,Just 5,Just 2,Just 3],IntCol [Just 4,Just 4,Just 1,Just 4,Just 1],IntCol [Just 2,Just 1,Just 1,Just 2,Just 2],IntCol [Nothing,Nothing,Nothing,Just 5,Just 1],IntCol [Just 1,Just 2,Just 2,Just 3,Just 0],IntCol [Nothing,Just 2,Just 1,Just 3,Just 0],IntCol [Just 4,Just 0,Just 1,Just 3,Just 0],IntCol [Just 0,Just 0,Just 4,Just 4,Just 2],IntCol [Just 0,Nothing,Nothing,Just 1,Just 0],IntCol [Just 5,Just 1,Just 1,Just 1,Just 1],IntCol [Just 1,Just 0,Just 5,Just 5,Just 1]]
 --------------------------------------------------------------------------------
 
 -- | Generate a small set of names for generated tests. These names are guaranteed to not include
