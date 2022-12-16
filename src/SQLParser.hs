@@ -360,12 +360,6 @@ queryP =
 parseQuery :: String -> Either P.ParseError Query
 parseQuery str = P.parse queryP (map toLower str)
 
--- Parses a SQL file (takes in filename of the SQL file)
--- Returns either a ParseError (Left) or a Query (Right)
--- TODO: fix this function so that it can call parseQuery above
-parseSqlFile :: String -> IO (Either P.ParseError Query)
-parseSqlFile = undefined "P.parseFromFile (const <$> parseQuery <*> P.eof)"
-
 -- | Checks if a Query contains valid SQL syntax / is semantically correct
 -- (this function will be used in QuickCheck properties as a precondition)
 validateQuery :: Query -> Either P.ParseError Bool

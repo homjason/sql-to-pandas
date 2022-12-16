@@ -181,6 +181,7 @@ instance Arbitrary Order where
   arbitrary = QC.arbitraryBoundedEnum
 
 -------------------------------------------------------------------------------
+-- TODO: define table equality
 
 -- Generator for Tables
 -- TODO: figure out how to generate Maybe values using QC.frequency
@@ -190,6 +191,8 @@ genTable schema = do
   numRows <- QC.chooseInt (1, 10)
 
   -- List of Column generators
+  -- (Map.toList schema) :: [(colName, colType)]
+  -- colGenerators :: [Gen Column]
   let colGenerators = map (\(colName, colType) -> genCol numRows colType) (Map.toList schema)
 
   -- TODO: figure out how to convert colGenerators to the Table type in TableTypes.hs
@@ -203,7 +206,7 @@ genTable schema = do
   return $ listArray ((0, 0), (2, 2)) []
 
 -- Generates a column of a fixed length containing
--- Maybe values of a particular type (for 1/7 of the time, we generate Nothing)
+-- Maybe values of a particular type (for 1/8th of the time, generate Nothing)
 genCol :: Int -> ColType -> Gen Column
 genCol colLen colType =
   case colType of
