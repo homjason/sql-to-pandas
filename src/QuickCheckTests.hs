@@ -1,4 +1,4 @@
--- QUESTION FOR JOE: how do we import the module defined in the Types folder?
+-- QUESTION: how do we import the module defined in the Types folder?
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -18,29 +18,20 @@ import Print
 import SQLParser
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
+import Test.QuickCheck qualified as Qc
 import Translator
 import Types.PandasTypes
 import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
 
--- TODO: fix
--- Check that getAggCols & getNonAggCols are disjoint partitions of getColNames
--- (helper functions called on ColExp)
--- prop_getAggAndNonAggColsDisjoint :: [ColExp] -> Bool
--- prop_getAggAndNonAggColsDisjoint cExps =
---   let cs = decompColExps cExps
---    in getAggCols cs `Set.union` getNonAggCols cs == getColNames cs
---         && getAggCols cs `Set.disjoint` getNonAggCols cs
-
--- TODO: fix!
--- genSelectExp :: Gen SelectExp
--- genSelectExp =
---   QC.oneof
---     [ Cols <$> genColName,
---       DistinctCols <$> genColName,
---       return EmptySelect
---     ]
+genSelectExp :: Gen SelectExp
+genSelectExp =
+  QC.oneof
+    [ Cols <$> QC.resize 3 (QC.listOf1 genColExp),
+      DistinctCols <$> QC.resize 3 (QC.listOf1 genColExp),
+      return Star
+    ]
 
 genColExp :: Gen ColExp
 genColExp =
@@ -49,17 +40,9 @@ genColExp =
       genAgg
     ]
 
--- List of permitted colnames
-colNames :: [ColName]
-colNames = ["total_bill", "tip", "day", "party_size"]
-
 -- Generator for column names
 genColName :: Gen ColName
 genColName = QC.elements colNames
-
--- List of permitted TableNames
-tableNames :: [TableName]
-tableNames = ["df", "df1", "df2", "_G", "x", "X", "y", "x0", "X0", "xy", "XY", "_x"]
 
 -- Generator for table names
 genTableName :: Gen TableName
@@ -97,10 +80,6 @@ genComparable =
       LitString <$> genSmallString,
       LitDouble <$> genSmallDouble
     ]
--- TODO: how to avoid leftTable & rightTable being the same?
--- (write a generator for pairs of distinct TableNames??)
-
--- ^ ^  enforce this in QuickCheck precondition
 
 -- Generator for Join Expressions
 instance Arbitrary JoinExp where
@@ -122,12 +101,28 @@ instance Arbitrary JoinExp where
 -- Arbitrary SQL queries
 instance Arbitrary Query where
   arbitrary :: Gen Query
-  arbitrary = undefined
+  arbitrary = do
+    select <- genSelectExp
+    from <- genFromExp
+    wher <- QC.frequency [(1, return Nothing), (7, Just <$> genWhereExp)]
+    groupBy <- QC.frequency [(1, return Nothing), (7, Just <$> genGroupBy)]
+    orderBy <-
+      QC.frequency
+        [ (1, return Nothing),
+          (7, Just <$> liftM2 (,) genColName (arbitrary :: Gen Order))
+        ]
+    limit <-
+      QC.frequency
+        [ (1, return Nothing),
+          (7, Just <$> genSmallInt)
+        ]
+    return $ Query select from wher groupBy orderBy limit
 
-  shrink :: Query -> [Query]
-  shrink = undefined
+genGroupBy :: Gen [ColName]
+genGroupBy = QC.resize 2 (QC.listOf1 genColName)
 
--- | Generator for non-empty strings of length <= 5 that only contain letters a-d (from HW4)
+-- | Generator for non-empty strings of length <= 5 that
+-- only contain letters a-d
 genSmallString :: Gen String
 genSmallString = QC.resize 5 (QC.listOf1 (QC.elements "abcd"))
 
@@ -178,7 +173,6 @@ instance Arbitrary Order where
   arbitrary = QC.arbitraryBoundedEnum
 
 -------------------------------------------------------------------------------
--- TODO: define table equality
 
 schema :: Schema
 schema = mkSchema [("bill", IntC), ("day", StringC)]
@@ -210,19 +204,6 @@ genTable schema = do
 
   -- idxToGenerator :: Map Int (Gen Column)
   let idxToGenerator = colToGenerator `Map.compose` idxToCol
-
-  -- List of Column generators
-  -- (Map.toList schema) :: [(colName, colType)]
-  -- colGenerators :: [Gen Column]
-  let colGenerators = map (\(colName, colType) -> genCol numRows colType) (Map.toList schema)
-
-  -- generatedCols :: Gen [Column]
-  -- let generatedCols = mapM colToValue colGenerators
-
-  -- TODO: figure out how to convert colGenerators to the Table type in TableTypes.hs
-
-  -- TODO: for each colname in the schema, lookup its column type
-  -- Then, generate a "column" (list of a fixed length with that type)
 
   -- TODO: "concatenate" the columns together to form a table
 
@@ -309,10 +290,18 @@ getPandasTable = undefined
 
 -- checkTableEquality :: Table --> Table
 -- checkTableEquality t1 t2 = Data.List.sort t1 == Data.List.sort t2
+--------------------------------------------------------------------------------
+-- Permitted table & column names
 
--- TODO: unit tests for parsing
+-- List of permitted colnames
+colNames :: [ColName]
+colNames = ["total_bill", "tip", "day", "party_size"]
+
+-- List of permitted TableNames
+tableNames :: [TableName]
+tableNames = ["df", "df1", "df2", "_G", "x", "X", "y", "x0", "X0", "xy", "XY", "_x"]
 
 --------------------------------------------------------------------------------
--- Convenience functions
+-- Convenience functions for QuickCheck (independent of generators)
 quickCheckN :: QC.Testable prop => Int -> prop -> IO ()
 quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
