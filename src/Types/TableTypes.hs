@@ -1,9 +1,8 @@
 module Types.TableTypes where
 
-import Data.Array (Array, (!), (//))
-import Data.Array qualified as Array
-import Data.Char qualified as Char
-import Data.Data (Data)
+import Data.Array
+import Data.Char
+import Data.Csv
 import Data.Foldable (toList)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -20,15 +19,36 @@ type Store = Map TableName Table
 
 -- Represents a singular value stored in a Table
 data Value
-  = NullVal -- null
-  | IntVal Int -- 1
+  = IntVal Int -- 1
   | StringVal String -- "abd"
   | DoubleVal Double -- 64-bit
   deriving (Eq, Show, Ord)
 
 -- Tables are represented as Arrays, indexed by their (row, col)
+-- Each cell contains a Maybe Value (we allow for null entries)
 -- (Recommended by Joe)
-type Table = Array (Int, Int) Value
+type Table = Array (Int, Int) (Maybe Value)
+
+-- | Helper function for creating a table
+mkTable :: (Int, Int) -> [Maybe Value] -> Table
+mkTable = curry listArray (0, 0)
+
+-- | Retrieves a table's dimensions in the form (numRows, numCols)
+dimensions :: Table -> (Int, Int)
+dimensions = snd . bounds
+
+-- TODO: delete (sample table)
+table :: Table
+table = mkTable (2, 3) [Just $ IntVal i | i <- [1 .. 9] :: [Int]]
+
+tableList :: [[Maybe Value]]
+tableList = tableToList table
+
+tableToList :: Table -> [[Maybe Value]]
+tableToList table =
+  let (numRows, numCols) = dimensions table
+   in [[table ! (i, j) | j <- [0 .. numCols - 1]] | i <- [0 .. numRows - 1]]
+
 
 -- Joe: represent Rows as Maybe Values, enforce row invariants at runtime
 type Row = [Maybe Value]

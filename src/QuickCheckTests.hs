@@ -195,6 +195,8 @@ genTable schema = do
   -- colGenerators :: [Gen Column]
   let colGenerators = map (\(colName, colType) -> genCol numRows colType) (Map.toList schema)
 
+  let generatedCols = sequence colGenerators
+
   -- TODO: figure out how to convert colGenerators to the Table type in TableTypes.hs
 
   -- TODO: for each colname in the schema, lookup its column type
