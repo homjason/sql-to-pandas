@@ -1073,24 +1073,24 @@ test_printPandasCommands =
 --------------------------------------------------------------------------------
 -- TABLE unit tests
 
-test_colToValue :: Test
-test_colToValue =
-  "testing colToValue"
-    ~: TestList
-      [ colToValue (IntCol [])
-          ~?= [],
-        colToValue (IntCol [Just 1, Nothing, Just 3])
-          ~?= [Just (IntVal 1), Nothing, Just (IntVal 3)],
-        colToValue (IntCol [Nothing, Nothing, Nothing])
-          ~?= [Nothing, Nothing, Nothing],
-        colToValue (StringCol [Just "1st", Just "2nd", Just "3rd"])
-          ~?= [ Just (StringVal "1st"),
-                Just (StringVal "2nd"),
-                Just (StringVal "3rd")
-              ],
-        colToValue (DoubleCol [Just 1.11, Just 2.22, Just 3.33])
-          ~?= [ Just (DoubleVal 1.11),
-                Just (DoubleVal 2.22),
-                Just (DoubleVal 3.33)
-              ]
-      ]
+-- test_colToValue :: Test
+-- test_colToValue =
+--   "testing colToValue"
+--     ~: TestList
+--       [ colToValue (IntCol [])
+--           ~?= [],
+--         colToValue (IntCol [Just 1, Nothing, Just 3])
+--           ~?= [Just (IntVal 1), Nothing, Just (IntVal 3)],
+--         colToValue (IntCol [Nothing, Nothing, Nothing])
+--           ~?= [Nothing, Nothing, Nothing],
+--         colToValue (StringCol [Just "1st", Just "2nd", Just "3rd"])
+--           ~?= [ Just (StringVal "1st"),
+--                 Just (StringVal "2nd"),
+--                 Just (StringVal "3rd")
+--               ],
+--         colToValue (DoubleCol [Just 1.11, Just 2.22, Just 3.33])
+--           ~?= [ Just (DoubleVal 1.11),
+--                 Just (DoubleVal 2.22),
+--                 Just (DoubleVal 3.33)
+--               ]
+--       ]

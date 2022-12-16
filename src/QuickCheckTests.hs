@@ -6,8 +6,9 @@ module QuickCheckTests where
 import Control.Monad (forM, replicateM)
 import Data.Array
 import Data.Data (Data)
+import Data.Map (Map)
 import Data.Map qualified as Map
-import Data.Maybe (isNothing)
+import Data.Maybe (catMaybes, isNothing)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Parser (Parser)
@@ -183,6 +184,16 @@ instance Arbitrary Order where
 -------------------------------------------------------------------------------
 -- TODO: define table equality
 
+schema :: Schema
+schema = mkSchema [("bill", IntC), ("day", StringC)]
+
+-- >>> colNameToIdx schema
+-- fromList [("bill",0),("day",1)]
+
+colToIdxMap :: Schema -> Map ColName Int
+colToIdxMap schema =
+  Map.mapWithKey (\colName _ -> colName `getColIndex` schema) schema
+
 -- Generator for Tables
 -- TODO: figure out how to generate Maybe values using QC.frequency
 genTable :: Schema -> Gen Table
@@ -190,13 +201,18 @@ genTable schema = do
   -- Arbitrarily generate the no. of rows
   numRows <- QC.chooseInt (1, 10)
 
+  -- TODO: figure out how to call colToIdxMap here
+
+  -- let colNames = Map.keys schema
+  -- let colIdxs = map (`getColIndex` schema) colNames
+
   -- List of Column generators
   -- (Map.toList schema) :: [(colName, colType)]
   -- colGenerators :: [Gen Column]
   let colGenerators = map (\(colName, colType) -> genCol numRows colType) (Map.toList schema)
 
   -- generatedCols :: Gen [Column]
-  let generatedCols = sequence colGenerators
+  -- let generatedCols = mapM colToValue colGenerators
 
   -- TODO: figure out how to convert colGenerators to the Table type in TableTypes.hs
 
@@ -213,42 +229,42 @@ genTable schema = do
 genCol :: Int -> ColType -> Gen Column
 genCol colLen colType =
   case colType of
-    IntC -> IntCol <$> genIntCol colLen
-    StringC -> StringCol <$> genStringCol colLen
-    DoubleC -> DoubleCol <$> genDoubleCol colLen
+    IntC -> Column <$> genIntCol colLen
+    StringC -> Column <$> genStringCol colLen
+    DoubleC -> Column <$> genDoubleCol colLen
   where
-    genIntCol :: Int -> Gen [Maybe Int]
+    genIntCol :: Int -> Gen [Maybe Value]
     genIntCol colLen =
       QC.vectorOf
         colLen
         ( QC.frequency
             [ (1, return Nothing),
-              (7, Just <$> genSmallInt)
+              (7, Just . IntVal <$> genSmallInt)
             ]
         )
 
-    genStringCol :: Int -> Gen [Maybe String]
+    genStringCol :: Int -> Gen [Maybe Value]
     genStringCol colLen =
       QC.vectorOf
         colLen
         ( QC.frequency
             [ (1, return Nothing),
-              (7, Just <$> genSmallString)
+              (7, Just . StringVal <$> genSmallString)
             ]
         )
 
-    genDoubleCol :: Int -> Gen [Maybe Double]
+    genDoubleCol :: Int -> Gen [Maybe Value]
     genDoubleCol colLen =
       QC.vectorOf
         colLen
         ( QC.frequency
             [ (1, return Nothing),
-              (7, Just <$> genSmallDouble)
+              (7, Just . DoubleVal <$> genSmallDouble)
             ]
         )
 
 -- >>> QC.sample' (genCol 5 IntC)
--- [IntCol [Just 3,Just 3,Just 5,Just 2,Just 3],IntCol [Just 4,Just 4,Just 1,Just 4,Just 1],IntCol [Just 2,Just 1,Just 1,Just 2,Just 2],IntCol [Nothing,Nothing,Nothing,Just 5,Just 1],IntCol [Just 1,Just 2,Just 2,Just 3,Just 0],IntCol [Nothing,Just 2,Just 1,Just 3,Just 0],IntCol [Just 4,Just 0,Just 1,Just 3,Just 0],IntCol [Just 0,Just 0,Just 4,Just 4,Just 2],IntCol [Just 0,Nothing,Nothing,Just 1,Just 0],IntCol [Just 5,Just 1,Just 1,Just 1,Just 1],IntCol [Just 1,Just 0,Just 5,Just 5,Just 1]]
+
 --------------------------------------------------------------------------------
 
 -- | Generate a small set of names for generated tests. These names are guaranteed to not include
