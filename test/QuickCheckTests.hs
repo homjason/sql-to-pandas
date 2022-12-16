@@ -1,6 +1,7 @@
 -- QUESTION: how do we import the module defined in the Types folder?
-{-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+-- {-# LANGUAGE ImportQualifiedPost #-}
+-- {-# LANGUAGE ScopedTypeVariables #-}
+
 
 module QuickCheckTests where
 

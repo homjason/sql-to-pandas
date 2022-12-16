@@ -111,7 +111,8 @@ instance PP Pandas.Command where
   Pretty printing for SQL Queries. This will be used for QuickCheck testing
 -}
 instance PP Query where
-  pp = undefined
+  pp (Query s f w gb ob l) = case (w, gb, ob, l) of
+    (Nothing, Nothing, Nothing, Nothing) -> undefined
 
 listToDoc :: [ColExp] -> Doc
 listToDoc cExps = case cExps of
@@ -120,12 +121,12 @@ listToDoc cExps = case cExps of
 
 instance PP SelectExp where
   -- pp (Cols cExps) = PP.text $ "SELECT " <> show (map pp cExps)
-  pp (Cols cExps) = PP.text $ "SELECT " <> tail (init (show (map pp cExps)))
+  pp (Cols cExps) = PP.text $ "SELECT " <> tail (init (show (map pp cExps))) <> "\n"
   -- pp (Cols cExps) = PP.text $ "SELECT " <> foldr (\x acc -> acc ++ pp x ++ PP.text ", ") PP.empty cExps
   -- pp (Cols cExps) = PP.text "SELECT " <> listToDoc cExps
   -- pp (Cols cExps) = PP.text "SELECT " <> intercalate ", " ((map (show . pp) cExps))
-  pp (DistinctCols cExps) = undefined
-  pp Star = undefined
+  pp (DistinctCols cExps) = PP.text $ "SELECT DISTINCT " <> tail (init (show (map pp cExps))) <> "\n"
+  pp Star = PP.text "SELECT *\n"
 
 instance PP ColExp where
   pp (Col cName) = PP.text cName
@@ -138,13 +139,29 @@ instance PP ColExp where
 -- >>> pp (Cols [Col "col1", Col "col2", Col "col3", Col "col4", Col "col5"])
 -- SELECT col1,col2,col3,col4,col5
 
-{-
-data ColExp
-  = Col ColName
-  | Agg AggFunc ColName -- Aggregate functions (used with GROUP BY clauses)
-  deriving
-    (Eq, Show)
--}
+-- >>> pp (DistinctCols [Col "col1", Agg Sum "col2"])
+-- SELECT DISTINCT col1,sum(col2)
+
+-- >>> pp (Star)
+-- SELECT *
+
+mapJoinStyleToSQLSyntax :: JoinStyle -> String
+mapJoinStyleToSQLSyntax js = case js of
+  LeftJoin -> " left join "
+  RightJoin -> " right join "
+  InnerJoin -> " join "
+
+instance PP FromExp where
+  pp (Table n) = PP.text $ "FROM " <> n <> " "
+  pp (TableJoin (Join lTable lCol rTable rCol st)) =
+    PP.text $ "FROM " <> lTable <> mapJoinStyleToSQLSyntax st <> rTable <> " ON " <> lTable <> "." <> lCol <> " = " <> rTable <> "." <> rCol
+  pp (SubQuery q jExp) = undefined
+
+-- >>> pp (Table "t1")
+-- FROM t1
+
+-- >>> pp (TableJoin (Join "A" "col1" "B" "col2" InnerJoin))
+-- FROM A join B ON A.col1 = B.col2
 
 instance PP Row where
   pp = undefined
