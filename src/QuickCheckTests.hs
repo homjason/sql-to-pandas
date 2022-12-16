@@ -1,9 +1,10 @@
 -- QUESTION FOR JOE: how do we import the module defined in the Types folder?
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module QuickCheckTests where
 
-import Control.Monad (forM, replicateM)
+import Control.Monad
 import Data.Array
 import Data.Data (Data)
 import Data.Map (Map)
@@ -72,18 +73,20 @@ genAgg = do
 
 -- Generator for FROM expressions
 genFromExp :: Gen FromExp
-genFromExp = undefined
+genFromExp =
+  QC.oneof
+    [ Table <$> genTableName,
+      TableJoin <$> arbitrary
+    ]
 
 -- Generator for WHERE expressions
--- TODO: fix!
--- genWhereExp :: Gen WhereExp
--- genWhereExp =
---   QC.oneof
---     [ OpC <$> genComparable <*> arbitrary <*> genComparable,
---       OpA <$> genComparable <*> arbitrary <*> genComparable,
---       OpL <$> arbitrary <*> arbitrary <*> arbitrary,
---       OpN <$> arbitrary <*> genColName
---     ]
+genWhereExp :: Gen WhereExp
+genWhereExp =
+  QC.oneof
+    [ liftM2 Op1 genWhereExp arbitrary,
+      liftM3 Op2 genWhereExp genBop genWhereExp,
+      CompVal <$> genComparable
+    ]
 
 -- Generator for Comparable values
 genComparable :: Gen Comparable
@@ -94,12 +97,10 @@ genComparable =
       LitString <$> genSmallString,
       LitDouble <$> genSmallDouble
     ]
-
--- TODO: how to ensure that genColName returns
--- an actual col from the table???
-
 -- TODO: how to avoid leftTable & rightTable being the same?
 -- (write a generator for pairs of distinct TableNames??)
+
+-- ^ ^  enforce this in QuickCheck precondition
 
 -- Generator for Join Expressions
 instance Arbitrary JoinExp where
@@ -125,11 +126,6 @@ instance Arbitrary Query where
 
   shrink :: Query -> [Query]
   shrink = undefined
-
--- QUESTION FOR JOE: given an input schema, how do we arbitrarily generate a Map in QuickCheck? (Each Row is a Map)
--- See https://stackoverflow.com/questions/59472608/quickcheck-sequential-map-key-generation
-genRow :: Gen Row
-genRow = undefined
 
 -- | Generator for non-empty strings of length <= 5 that only contain letters a-d (from HW4)
 genSmallString :: Gen String
@@ -190,21 +186,30 @@ schema = mkSchema [("bill", IntC), ("day", StringC)]
 -- >>> colNameToIdx schema
 -- fromList [("bill",0),("day",1)]
 
-colToIdxMap :: Schema -> Map ColName Int
-colToIdxMap schema =
+getColIdxs :: Schema -> Map ColName Int
+getColIdxs schema =
   Map.mapWithKey (\colName _ -> colName `getColIndex` schema) schema
 
 -- Generator for Tables
--- TODO: figure out how to generate Maybe values using QC.frequency
+-- Schema :: Map ColName ColType
 genTable :: Schema -> Gen Table
 genTable schema = do
   -- Arbitrarily generate the no. of rows
   numRows <- QC.chooseInt (1, 10)
 
-  -- TODO: figure out how to call colToIdxMap here
+  let numCols = Map.size schema
 
-  -- let colNames = Map.keys schema
-  -- let colIdxs = map (`getColIndex` schema) colNames
+  -- ScopedTypeVariables GHC extension gives us
+  -- type annotations for let bindings (for ease of readability)
+  let colToIdx = getColIdxs schema :: Map ColName Int
+
+  let idxToCol = invertMap colToIdx :: Map Int ColName
+
+  -- colToGenerator :: Map ColName (Gen Column)
+  let colToGenerator = Map.mapWithKey (\colName colType -> genCol numRows colType) schema
+
+  -- idxToGenerator :: Map Int (Gen Column)
+  let idxToGenerator = colToGenerator `Map.compose` idxToCol
 
   -- List of Column generators
   -- (Map.toList schema) :: [(colName, colType)]
@@ -263,7 +268,8 @@ genCol colLen colType =
             ]
         )
 
--- >>> QC.sample' (genCol 5 IntC)
+-- >>> QC.sample' (genCol 3 IntC)
+-- [Column [Just (IntVal 1),Just (IntVal 4),Just (IntVal 5)],Column [Nothing,Just (IntVal 3),Just (IntVal 4)],Column [Just (IntVal 2),Just (IntVal 5),Just (IntVal 4)],Column [Just (IntVal 3),Just (IntVal 1),Just (IntVal 3)],Column [Just (IntVal 2),Just (IntVal 5),Just (IntVal 0)],Column [Just (IntVal 4),Just (IntVal 0),Just (IntVal 5)],Column [Just (IntVal 5),Just (IntVal 0),Just (IntVal 1)],Column [Just (IntVal 4),Nothing,Just (IntVal 4)],Column [Just (IntVal 1),Just (IntVal 3),Just (IntVal 1)],Column [Nothing,Just (IntVal 2),Just (IntVal 2)],Column [Just (IntVal 2),Just (IntVal 0),Nothing]]
 
 --------------------------------------------------------------------------------
 
