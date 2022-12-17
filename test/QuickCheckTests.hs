@@ -309,47 +309,64 @@ genSchemaAndTable = genSchema >>= genTable
 accept :: (Table, Schema) -> Query -> Bool
 accept (table, schema) (Query s f w gb ob l) =
   let colNameToCol = getColOfTable schema table
-      (numRows, numCols) = dimensions table
-   in checkSelect (table, schema) s
+   in checkSelect schema s
         && checkFrom (table, schema) f
-        && checkWhere (table, schema) w
-        && checkGroupBy (table, schema) gb
-        && checkOrderBy (table, schema) ob
+        && checkWhere schema w
+        && checkGroupBy schema gb
+        && checkOrderBy schema ob
         && checkLimit table l
   where
-    checkSelect :: (Table, Schema) -> SelectExp -> Bool
-    checkSelect (table, schema) s =
-      case s of
-        Cols colExps -> undefined "TODO"
-        DistinctCols colExps -> undefined "TODO"
-        Star -> True
+    -- Checks if the columns in a SQL query are present in the table schema
+    checkColsInQuery :: [ColName] -> Schema -> Bool
+    checkColsInQuery colNames schema =
+      let colsInQuery = Set.fromList colNames
+          colsInTable = (Set.fromList . Map.keys) schema
+       in colsInQuery `Set.isSubsetOf` colsInTable
 
-    -- If the SQL query is only selecting from a single table, since tables are
+    -- Checks that the table schema accepts the SELECT expression
+    checkSelect :: Schema -> SelectExp -> Bool
+    checkSelect schema selectExp =
+      case selectExp of
+        Star -> True
+        Cols colExps -> colExpHandler colExps
+        DistinctCols colExps -> colExpHandler colExps
+      where
+        colExpHandler colExps =
+          let cs = [c | cExp@(Col c) <- colExps]
+           in checkColsInQuery cs schema
+
+    -- If the SQL query is only selects from a single table, since tables are
     -- arbitrarily generated, the table name is independent of whether the
     -- query conforms to the table's schema (the types of its columns),
     -- so return True if the fromExp only consists of a single TableName
     checkFrom :: (Table, Schema) -> FromExp -> Bool
-    checkFrom (table, schema) f =
-      case f of
+    checkFrom (table, schema) fromExp =
+      case fromExp of
         Table _ -> True
-        TableJoin joinExp -> undefined "TODO"
+        TableJoin joinExp ->
+          undefined "TODO: figure out how to resolve columns from two tables!!!"
 
-    checkWhere :: (Table, Schema) -> Maybe WhereExp -> Bool
-    checkWhere (table, schema) w =
-      case w of
-        Just w' -> undefined "TODO"
-        Nothing -> True
+    checkWhere :: Schema -> Maybe WhereExp -> Bool
+    checkWhere schema Nothing = True
+    checkWhere schema (Just whereExp) =
+      case whereExp of
+        Op1 w uop -> checkWhere schema (Just w)
+        Op2 w1 bop w2 ->
+          checkWhere schema (Just w1) && checkWhere schema (Just w2)
+        CompVal (ColName c) -> checkColsInQuery [c] schema
+        -- Literal string/int/double values are accepted
+        CompVal _ -> True
 
-    checkGroupBy :: (Table, Schema) -> Maybe [ColName] -> Bool
-    checkGroupBy (table, schema) gb =
+    checkGroupBy :: Schema -> Maybe [ColName] -> Bool
+    checkGroupBy schema gb =
       case gb of
-        Just cols -> undefined "TODO"
+        Just cols -> checkColsInQuery cols schema
         Nothing -> True
 
-    checkOrderBy :: (Table, Schema) -> Maybe (ColName, Order) -> Bool
-    checkOrderBy (table, schema) ob =
+    checkOrderBy :: Schema -> Maybe (ColName, Order) -> Bool
+    checkOrderBy schema ob =
       case ob of
-        Just (col, order) -> undefined "TODO"
+        Just (col, order) -> checkColsInQuery [col] schema
         Nothing -> True
 
     checkLimit :: Table -> Maybe Int -> Bool
