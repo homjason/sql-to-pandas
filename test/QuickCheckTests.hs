@@ -27,6 +27,7 @@ import Test.QuickCheck qualified as Qc
 import Translator
 import Types.PandasTypes
 import Types.SQLTypes
+-- import Types.TableTypes
 import Types.TableTypes
 import Types.Types
 
@@ -307,9 +308,6 @@ genSchemaAndTable :: Gen Table
 genSchemaAndTable = do
   schema <- genSchema
   genTable schema
-
-t :: Table
-t = array ((0, 0), (3, 0)) [((0, 0), Just (IntVal 3)), ((1, 0), Just (IntVal 1)), ((2, 0), Just (IntVal 3)), ((3, 0), Nothing)]
 
 -- TODO: implement function that figures out if a table accepts a query
 

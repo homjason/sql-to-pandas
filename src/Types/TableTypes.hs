@@ -67,13 +67,39 @@ mkTable :: (Int, Int) -> [Maybe Value] -> Table
 mkTable = curry listArray (0, 0)
 
 -- | Equivalent of "map" for pairs consisting of the same type
-mapPair :: (a -> b) -> (a, a) -> (b, b)
-mapPair f (a1, a2) = (f a1, f a2)
+-- mapPair :: (a -> b) -> (a, a) -> (b, b)
+-- mapPair f (a1, a2) = (f a1, f a2)
 
 -- | Retrieves a table's dimensions in the form (numRows, numCols)
 -- (need to add 1 when computing dimensions since tables are 0-indexed)
+-- TODO: figure out dimensions!
 dimensions :: Table -> (Int, Int)
-dimensions table = mapPair (+ 1) $ (snd . bounds) table
+dimensions table = undefined
+
+-- case tableToList table of
+--   [[]] -> undefined
+--   _ -> undefined
+-- let (numRows, numCols) = (snd . bounds) table
+--  in if numCols == 0
+--       then (numRows + 1, numCols + 1)
+--       else (numRows + 1, numCols)
+
+-- in (numRows, numCols)
+
+t1 :: Table
+t1 = array ((0, 0), (3, 0)) [((0, 0), Just (IntVal 3)), ((1, 0), Just (IntVal 1)), ((2, 0), Just (IntVal 3)), ((3, 0), Just (IntVal 4))]
+
+-- >>> tableToList $ array ((0, 0), (0, 0)) []
+-- Prelude.undefined
+
+-- >>> dimensions t1
+-- (4,1)
+
+-- >>> dimensions $ array ((0, 0), (0, 0)) []
+-- (1,1)
+
+-- >>> dimensions (array ((0, 0), (0, 1)) [((0, 0), Just (IntVal 1))])
+-- (0,1)
 
 -- | Converts a Table to a human-readable 2D list
 -- (for the purposes of exporting to a CSV)

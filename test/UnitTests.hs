@@ -1,5 +1,6 @@
 module UnitTests where
 
+import Data.Array (Array, array)
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Parser
@@ -1072,6 +1073,19 @@ test_printPandasCommands =
 
 --------------------------------------------------------------------------------
 -- TABLE unit tests
+
+test_dimensions :: Test
+test_dimensions =
+  "testing fetching table dimensions"
+    ~: TestList
+      [ dimensions (array ((0, 0), (0, 0)) [])
+          ~?= (0, 0),
+        dimensions (array ((0, 0), (0, 1)) [((0, 0), Just (IntVal 1))])
+          ~?= (1, 0),
+        dimensions
+          (array ((0, 0), (3, 0)) [((0, 0), Just (IntVal 3)), ((1, 0), Just (IntVal 1)), ((2, 0), Just (IntVal 3)), ((3, 0), Just (IntVal 4))])
+          ~?= (4, 1)
+      ]
 
 -- test_colToValue :: Test
 -- test_colToValue =
