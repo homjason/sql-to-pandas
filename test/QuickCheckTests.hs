@@ -2,7 +2,6 @@
 -- {-# LANGUAGE ImportQualifiedPost #-}
 -- {-# LANGUAGE ScopedTypeVariables #-}
 
-
 module QuickCheckTests where
 
 -- TOOD: look at error instance for QC
@@ -11,6 +10,7 @@ module QuickCheckTests where
 import Control.Monad
 import Data.Array
 import Data.Data (Data)
+import Data.List
 import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Maybe (catMaybes, isNothing)
@@ -192,8 +192,52 @@ instance Arbitrary Order where
 schema :: Schema
 schema = mkSchema [("bill", IntC), ("day", StringC)]
 
--- >>> colNameToIdx schema
--- fromList [("bill",0),("day",1)]
+colToIdx :: Map ColName Int
+colToIdx = getColIdxs schema
+
+colToGenerator :: Map ColName (Gen Column)
+colToGenerator = Map.mapWithKey (\_ cType -> genCol 5 cType) schema
+
+idxToGenerator :: Map Int (Gen Column)
+idxToGenerator = colToGenerator `Map.compose` invertMap colToIdx
+
+colMap :: Gen (Map Int Column)
+colMap = sequence idxToGenerator
+
+testCols = [(0, Column [Just (IntVal 1), Just (IntVal 0), Just (IntVal 2), Just (IntVal 1), Just (IntVal 1)]), (1, Column [Just (StringVal "bcbca"), Just (StringVal "d"), Nothing, Nothing, Nothing])]
+
+-- >>> map snd testCols
+-- [Column [Just (IntVal 1),Just (IntVal 0),Just (IntVal 2),Just (IntVal 1),Just (IntVal 1)],Column [Just (StringVal "bcbca"),Just (StringVal "d"),Nothing,Nothing,Nothing]]
+
+goos :: [[Maybe Value]]
+goos = [c' | c@(Column c') <- map snd testCols]
+
+-- >>> goos
+-- [[Just (IntVal 1),Just (IntVal 0),Just (IntVal 2),Just (IntVal 1),Just (IntVal 1)],[Just (StringVal "bcbca"),Just (StringVal "d"),Nothing,Nothing,Nothing]]
+
+-- >>> transpose goos
+-- [[Just (IntVal 1),Just (StringVal "bcbca")],[Just (IntVal 0),Just (StringVal "d")],[Just (IntVal 2),Nothing],[Just (IntVal 1),Nothing],[Just (IntVal 1),Nothing]]
+
+-- >>> concat (transpose goos)
+-- [Just (IntVal 1),Just (StringVal "bcbca"),Just (IntVal 0),Just (StringVal "d"),Just (IntVal 2),Nothing,Just (IntVal 1),Nothing,Just (IntVal 1),Nothing]
+
+gt = concat (transpose goos)
+
+idxs = [(i, j) | i <- [0 .. numRows - 1], j <- [0 .. numCols - 1]]
+
+-- >>> zip idxs gt
+-- [((0,0),Just (IntVal 1)),((0,1),Just (StringVal "bcbca")),((1,0),Just (IntVal 0)),((1,1),Just (StringVal "d")),((2,0),Just (IntVal 2)),((2,1),Nothing),((3,0),Just (IntVal 1)),((3,1),Nothing),((4,0),Just (IntVal 1)),((4,1),Nothing)]
+
+-- >>> listArray ((0, 0), (numRows - 1, numCols - 1)) gt
+
+numRows = 5
+
+numCols = 2
+
+arr = listArray ((0, 0), (numRows, numCols)) goos
+
+-- >>> QC.sample' colMap
+-- [fromList [(0,Column [Just (IntVal 1),Just (IntVal 0),Just (IntVal 2),Just (IntVal 1),Just (IntVal 1)]),(1,Column [Just (StringVal "bcbca"),Just (StringVal "d"),Nothing,Nothing,Nothing])]
 
 getColIdxs :: Schema -> Map ColName Int
 getColIdxs schema =
@@ -208,25 +252,19 @@ genTable schema = do
 
   let numCols = Map.size schema
 
-  -- ScopedTypeVariables GHC extension gives us
-  -- type annotations for let bindings (for ease of readability)
-  let colToIdx = getColIdxs schema :: Map ColName Int
+  -- colToIdx :: Map ColName Int
+  let colToIdx = getColIdxs schema
 
   -- colToGenerator :: Map ColName (Gen Column)
-  let colToGenerator = Map.mapWithKey (\colName colType -> genCol numRows colType) schema
+  let colToGenerator = Map.mapWithKey (\_ cType -> genCol numRows cType) schema
 
   -- idxToGenerator :: Map Int (Gen Column)
-  let idxToGenerator = colToGenerator `Map.compose` idxToCol
-    where 
-      -- idxToCol :: Map Int ColName
-      idxToCol = invertMap colToIdx 
+  let idxToGenerator = colToGenerator `Map.compose` invertMap colToIdx
 
-
-  -- THIS IS THE STUFF JOE ADDED
   -- colMap :: Map Int Column
-  colMap <- sequence idxToGenerator -- :: Gen (Map Int Column)
+  colMap <- sequence idxToGenerator
 
-  
+  let idxColPairs = Map.toList colMap
 
   -- Then do some indexing math to generate a list of [Maybe Values]
   -- Then call listArray (from Data.Array) to turn that list into a table
