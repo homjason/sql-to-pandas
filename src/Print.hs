@@ -163,7 +163,6 @@ instance PP FromExp where
   pp (Table n) = PP.text $ "FROM " <> n <> " "
   pp (TableJoin (Join lTable lCol rTable rCol st)) =
     PP.text $ "FROM " <> lTable <> mapJoinStyleToSQLSyntax st <> rTable <> " ON " <> lTable <> "." <> lCol <> " = " <> rTable <> "." <> rCol
-  pp (SubQuery q jExp) = undefined
 
 -- >>> pp (Table "t1")
 -- FROM t1

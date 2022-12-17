@@ -52,7 +52,6 @@ data ColExp
 data FromExp
   = Table TableName
   | TableJoin JoinExp
-  | SubQuery Query (Maybe JoinExp)
   deriving (Eq, Show)
 
 -- Datatype for JOIN clauses in SQL (only equality joins supported)

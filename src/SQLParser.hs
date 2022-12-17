@@ -211,7 +211,6 @@ joinTokenP =
     <|> constP "right join" RightJoin
 
 -- | Parser for FROM expressions
--- TODO: handle subqueries
 fromExpP :: Parser FromExp
 fromExpP =
   P.choice

@@ -39,8 +39,7 @@ moveResetIndex fns =
 -- >>> moveResetIndex [Pandas.GroupBy ["col1"], ResetIndex, Aggregate Count "col2"]
 -- [GroupBy ["col1"],Aggregate Count "col2",ResetIndex]
 
--- Given a SQL query, extracts a list of (equivalent) Pandas functions
-
+-- | Given a SQL query, extracts a list of (equivalent) Pandas functions
 getFuncs :: Query -> Maybe [Func]
 getFuncs q@(Query s f w gb ob l) =
   let funcList = getJoinFunc (translateFromExp f) ++ whereExpToLoc w ++ groupByToPandasGroupBy gb ++ getFnsFromSelectTranslation (selectExpToCols s) ++ orderByToSortValues ob ++ limitExpToHead l
@@ -48,7 +47,8 @@ getFuncs q@(Query s f w gb ob l) =
         [] -> Nothing
         hd : tl -> Just $ moveResetIndex funcList
 
--- Converts a list of ColExps into list of pairs consisting of colnames & aggregate functions
+-- | Converts a list of ColExps into list of pairs consisting of colnames
+-- & aggregate functions
 decompColExps :: [ColExp] -> [(ColName, Maybe Func)]
 decompColExps = map decompose
   where
@@ -93,15 +93,13 @@ getColsFromSelectTranslation (cNames, mFn) = cNames
 getFnsFromSelectTranslation :: ([ColName], Maybe [Func]) -> [Func]
 getFnsFromSelectTranslation (cNames, mFn) = Data.Maybe.fromMaybe [] mFn
 
--- Converts "FROM" expressions in SQL to the table name and translates the
+-- | Converts "FROM" expressions in SQL to the table name and translates the
 -- JOIN expression too if present
-
 translateFromExp :: FromExp -> (TableName, Maybe Func)
 translateFromExp fromExp =
   case fromExp of
     Table name -> (name, Nothing)
     TableJoin joinExp -> (leftTable joinExp, Just $ translateJoinExp joinExp)
-    SubQuery query mJoin -> undefined "TODO"
 
 getJoinFunc :: (TableName, Maybe Func) -> [Func]
 getJoinFunc (tName, f) = case f of
@@ -111,7 +109,7 @@ getJoinFunc (tName, f) = case f of
 getTableName :: (TableName, Maybe Func) -> TableName
 getTableName (tName, f) = tName
 
--- Converts "JOIN ON" expressions in SQL to Pandas' Merge function
+-- | Converts "JOIN ON" expressions in SQL to Pandas' Merge function
 translateJoinExp :: JoinExp -> Func
 translateJoinExp je@(Join leftTable leftCol rightTable rightCol style) =
   Merge $
@@ -122,29 +120,29 @@ translateJoinExp je@(Join leftTable leftCol rightTable rightCol style) =
         how = style
       }
 
--- Converts "WHERE" expressions in SQL to "loc" function in Pandas
+-- | Converts "WHERE" expressions in SQL to "loc" function in Pandas
 whereExpToLoc :: Maybe WhereExp -> [Func]
 whereExpToLoc wExp = case wExp of
   Nothing -> []
   Just we -> [Loc we]
 
--- Converts "LIMIT" clauses in SQL to "head" function in Pandas
+-- | Converts "LIMIT" clauses in SQL to "head" function in Pandas
 limitExpToHead :: Maybe Int -> [Func]
 limitExpToHead x = case x of
   Nothing -> []
   Just n -> [Head n]
 
--- Converts "ORDER BY" clauses in SQL to "sort" function in Pandas
+-- | Converts "ORDER BY" clauses in SQL to "sort" function in Pandas
 orderByToSortValues :: Maybe (ColName, Order) -> [Func]
 orderByToSortValues colOrd = case colOrd of
   Nothing -> []
   Just (col, o) -> [SortValues col o]
 
--- Extracts Agg from [ColExp]
+-- | Extracts Agg from [ColExp]
 getAggs :: [ColExp] -> [ColExp]
 getAggs cExps = [x | x@(Agg f cols) <- cExps]
 
--- Converts a list of columns to be grouped on (in SQL) into
+-- | Converts a list of columns to be grouped on (in SQL) into
 -- a Pandas groupby() function invocation
 groupByToPandasGroupBy :: Maybe [ColName] -> [Func]
 groupByToPandasGroupBy cols = case cols of

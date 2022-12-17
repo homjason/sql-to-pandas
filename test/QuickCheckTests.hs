@@ -255,7 +255,8 @@ genTable schema
     -- elts :: [Maybe Value]
     let elts = concat (transpose cols)
 
-    -- TODO: need to figure out a way of mapping colnames to each cell in a row
+    -- TODO: figure out how to associate table name with table
+    -- (add tablename to schema???)
 
     -- Create the Table & use return to create a Generator of Tables
     return $ listArray ((0, 0), (numRows - 1, numCols - 1)) elts
@@ -304,12 +305,58 @@ genCol colLen colType =
 genSchemaAndTable :: Gen Table
 genSchemaAndTable = genSchema >>= genTable
 
--- >>> QC.sample' genSchema
--- [fromList [("col0",StringC)],fromList [("col0",StringC)],fromList [("col0",StringC)],fromList [("col0",StringC),("col1",DoubleC)],fromList [("col0",DoubleC)],fromList [("col0",DoubleC)],fromList [("col0",IntC),("col1",IntC),("col2",IntC)],fromList [("col0",StringC)],fromList [("col0",StringC),("col1",IntC),("col2",StringC)],fromList [("col0",DoubleC),("col1",StringC),("col2",StringC),("col3",IntC)],fromList [("col0",StringC)]]
+-- | Given a (table, schema) pair, decide if a particular query is accepted by the table
+accept :: (Table, Schema) -> Query -> Bool
+accept (table, schema) (Query s f w gb ob l) =
+  let colNameToCol = getColOfTable schema table
+      (numRows, numCols) = dimensions table
+   in checkSelect (table, schema) s
+        && checkFrom (table, schema) f
+        && checkWhere (table, schema) w
+        && checkGroupBy (table, schema) gb
+        && checkOrderBy (table, schema) ob
+        && checkLimit table l
+  where
+    checkSelect :: (Table, Schema) -> SelectExp -> Bool
+    checkSelect (table, schema) s =
+      case s of
+        Cols colExps -> undefined "TODO"
+        DistinctCols colExps -> undefined "TODO"
+        Star -> True
 
--- | Given a table, decide if a particular query is accepted by the table
-accept :: Table -> Query -> Bool
-accept table (Query s f w gb ob l) = undefined
+    -- If the SQL query is only selecting from a single table, since tables are
+    -- arbitrarily generated, the table name is independent of whether the
+    -- query conforms to the table's schema (the types of its columns),
+    -- so return True if the fromExp only consists of a single TableName
+    checkFrom :: (Table, Schema) -> FromExp -> Bool
+    checkFrom (table, schema) f =
+      case f of
+        Table _ -> True
+        TableJoin joinExp -> undefined "TODO"
+
+    checkWhere :: (Table, Schema) -> Maybe WhereExp -> Bool
+    checkWhere (table, schema) w =
+      case w of
+        Just w' -> undefined "TODO"
+        Nothing -> True
+
+    checkGroupBy :: (Table, Schema) -> Maybe [ColName] -> Bool
+    checkGroupBy (table, schema) gb =
+      case gb of
+        Just cols -> undefined "TODO"
+        Nothing -> True
+
+    checkOrderBy :: (Table, Schema) -> Maybe (ColName, Order) -> Bool
+    checkOrderBy (table, schema) ob =
+      case ob of
+        Just (col, order) -> undefined "TODO"
+        Nothing -> True
+
+    checkLimit :: Table -> Maybe Int -> Bool
+    checkLimit _table Nothing = True
+    checkLimit table (Just n) =
+      let (numRows, _) = dimensions table
+       in n <= numRows
 
 -- | Generator for queries that are accepted by a given table
 genTableQuery :: Table -> Query
@@ -360,9 +407,9 @@ getPandasTable = undefined
 colNames :: [ColName]
 colNames = ["col0", "col1", "col2", "col3", "col4"]
 
--- List of permitted TableNames
+-- List of permitted TableNames (single letters from A - Z)
 tableNames :: [TableName]
-tableNames = ["df", "df1", "df2", "_G", "x", "X", "y", "x0", "X0", "xy", "XY", "_x"]
+tableNames = map (: []) ['A' .. 'Z']
 
 --------------------------------------------------------------------------------
 -- Convenience functions for QuickCheck (independent of generators)

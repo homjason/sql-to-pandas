@@ -34,7 +34,7 @@ type Table = Array (Int, Int) (Maybe Value)
 
 -- Each schema is a map from ColName to a ColType
 -- (Schemas are internally ordered by lexicographic order of the colname
--- since ColName is the type of the key in this Map)
+-- since ColName is the type of the keys in this Map)
 type Schema = Map ColName ColType
 
 -- Permitted types for columns
@@ -84,8 +84,8 @@ getColIdxs :: Schema -> Map ColName Int
 getColIdxs schema =
   Map.mapWithKey (\colName _ -> colName `getColIndex` schema) schema
 
--- | Given a schema & a table,
--- maps each colname to the particular column in the table
+-- | Given a schema & a table, maps each colname to the particular column
+-- in the table (this function presumes that the table adheres to the schema)
 getColOfTable :: Schema -> Table -> Map ColName Column
 getColOfTable schema table =
   let (colnames, colToIdx) = (Map.keys schema, getColIdxs schema)
