@@ -71,7 +71,7 @@ printFn (Pandas.SortValues cName o) = ".sort_values(by=[" ++ show cName ++ "], a
 printFn (Pandas.Rename colNameMap) = undefined
 printFn (Pandas.GroupBy colNames) = ".groupBy(by=" ++ show colNames ++ ")"
 printFn (Pandas.Aggregate fn col) = ".agg({" ++ show col ++ ":" ++ show (lowerAggName (show fn)) ++ "})"
-printFn (Pandas.Loc whereExp) = undefined
+printFn (Pandas.Loc boolExp) = undefined
 printFn (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = ".merge(" ++ rightDf ++ ", left_on=" ++ show leftOn ++ ", right_on=" ++ show rightOn ++ ", how=" ++ show (mapJoinStyleToPandasSyntax how) ++ ")"
 printFn (Pandas.Unique colNames) = ".drop_duplicates(subset=" ++ show colNames ++ ")"
 printFn (Pandas.Head n) = ".head(" ++ show n ++ ")"
@@ -79,9 +79,6 @@ printFn Pandas.ResetIndex = ".reset_index()"
 
 instance PP Pandas.MergeExp where
   pp (Pandas.MkMerge rightDf leftOn rightOn how) = PP.text (".merge(" ++ show rightDf ++ ", left_on=\"" ++ show leftOn ++ "\", right_on=\"" ++ show rightOn ++ "\", how=\"" ++ show how ++ "\")")
-
-instance PP WhereExp where
-  pp = undefined
 
 -- TODO: figure out how to print a table
 instance PP Pandas.Block where
@@ -171,6 +168,45 @@ instance PP FromExp where
   pp (Table n) = PP.text $ "FROM " <> n <> " "
   pp (TableJoin (Join lTable lCol rTable rCol st)) =
     PP.text $ "FROM " <> lTable <> mapJoinStyleToSQLSyntax st <> rTable <> " ON " <> lTable <> "." <> lCol <> " = " <> rTable <> "." <> rCol
+
+instance PP WhereExp where
+  pp (Op2 we1 bop we2) = pp we1 <> PP.char ' ' <> pp bop <> PP.char ' ' <> pp we2
+  pp (Op1 we uop) = pp we <> PP.char ' ' <> pp uop
+  pp (CompVal c) = pp c
+
+instance PP Comparable where
+  pp (ColName cn) = PP.text cn
+  pp (LitInt i) = PP.int i
+  pp (LitString s) = PP.text $ show s
+  pp (LitDouble d) = PP.double d
+
+instance PP Uop where
+  pp IsNull = PP.text "IS NULL"
+  pp IsNotNull = PP.text "IS NOT NULL"
+
+instance PP Bop where
+  pp (Comp op) = case op of
+    Eq -> PP.char '='
+    Neq -> PP.text "NOT"
+    Gt -> PP.char '>'
+    Ge -> PP.text ">="
+    Lt -> PP.char '<'
+    Le -> PP.text "<="
+  pp (Arith op) = case op of
+    Plus -> PP.char '+'
+    Minus -> PP.char '-'
+    Times -> PP.char '*'
+    Divide -> PP.char '/'
+    Modulo -> PP.text "%"
+  pp (Logic op) = case op of
+    And -> PP.text "AND"
+    Or -> PP.text "OR"
+
+-- >>> pp (Op2 (CompVal (ColName "c1")) (Comp Gt) (CompVal (LitInt 5)))
+-- c1 > 5
+
+-- >>> pp (Op1 (CompVal (ColName "c1")) IsNull)
+-- c1 IS NULL
 
 -- >>> pp (Table "t1")
 -- FROM t1
