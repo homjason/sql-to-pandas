@@ -11,7 +11,7 @@ import Parser qualified as P
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 import Types.PandasTypes as Pandas
-import Types.SQLTypes
+import Types.SQLTypes as SQL
 import Types.TableTypes
 import Types.Types
 
@@ -120,11 +120,17 @@ translateJoinExp je@(Join leftTable leftCol rightTable rightCol style) =
         how = style
       }
 
+whereExpToBoolExp :: WhereExp -> BoolExp
+whereExpToBoolExp we = case we of
+  SQL.Op1 we' uop -> Pandas.Op1 (whereExpToBoolExp we') uop
+  SQL.Op2 we1 bop we2 -> Pandas.Op2 (whereExpToBoolExp we1) bop (whereExpToBoolExp we2)
+  SQL.CompVal com -> Pandas.CompVal com
+
 -- | Converts "WHERE" expressions in SQL to "loc" function in Pandas
 whereExpToLoc :: Maybe WhereExp -> [Func]
 whereExpToLoc wExp = case wExp of
   Nothing -> []
-  Just we -> [Loc we]
+  Just we -> [Loc (whereExpToBoolExp we)]
 
 -- | Converts "LIMIT" clauses in SQL to "head" function in Pandas
 limitExpToHead :: Maybe Int -> [Func]

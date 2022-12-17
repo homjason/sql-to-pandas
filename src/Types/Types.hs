@@ -18,11 +18,11 @@ data Order = Asc | Desc
 -- Datatype for filtering rows (WHERE clauses in SQL)
 -- The only unary operators supported are "IS NULL" / "IS NOT NULL",
 -- which are applied postfix in SQL
-data WhereExp
-  = Op1 WhereExp Uop
-  | Op2 WhereExp Bop WhereExp
-  | CompVal Comparable
-  deriving (Eq, Show)
+-- data WhereExp
+--   = Op1 WhereExp Uop
+--   | Op2 WhereExp Bop WhereExp
+--   | CompVal Comparable
+--   deriving (Eq, Show)
 
 -- Values that can be compared in SQL queries (either columns or literal values)
 data Comparable
