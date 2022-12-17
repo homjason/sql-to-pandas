@@ -66,9 +66,14 @@ getColIndex colName schema =
 mkTable :: (Int, Int) -> [Maybe Value] -> Table
 mkTable = curry listArray (0, 0)
 
+-- | Equivalent of "map" for pairs consisting of the same type
+mapPair :: (a -> b) -> (a, a) -> (b, b)
+mapPair f (a1, a2) = (f a1, f a2)
+
 -- | Retrieves a table's dimensions in the form (numRows, numCols)
+-- (need to add 1 when computing dimensions since tables are 0-indexed)
 dimensions :: Table -> (Int, Int)
-dimensions = snd . bounds
+dimensions table = mapPair (+ 1) $ (snd . bounds) table
 
 -- | Converts a Table to a human-readable 2D list
 -- (for the purposes of exporting to a CSV)

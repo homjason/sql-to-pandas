@@ -301,6 +301,16 @@ genCol colLen colType =
             ]
         )
 
+-- "Wrapper" generators that randomly generates a table schema
+-- & a table that abides by that schema
+genSchemaAndTable :: Gen Table
+genSchemaAndTable = do
+  schema <- genSchema
+  genTable schema
+
+t :: Table
+t = array ((0, 0), (3, 0)) [((0, 0), Just (IntVal 3)), ((1, 0), Just (IntVal 1)), ((2, 0), Just (IntVal 3)), ((3, 0), Nothing)]
+
 -- TODO: implement function that figures out if a table accepts a query
 
 -- TODO: generate queries that are accepted by a table
