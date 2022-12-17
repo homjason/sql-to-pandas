@@ -197,18 +197,27 @@ instance Arbitrary Order where
 -------------------------------------------------------------------------------
 -- Generator for Schemas & Tables
 
+-- Generator for the type of a column
+genColType :: Gen ColType
+genColType = QC.oneof [return IntC, return StringC, return DoubleC]
+
 -- Generator for schemas
 genSchema :: Gen Schema
-genSchema = Map.fromList <$> genSchemaPairs
-  where
-    -- Generates a list of (ColName, ColType) pairs
-    genSchemaPairs :: Gen [(ColName, ColType)]
-    genSchemaPairs = QC.listOf1 $ liftM2 (,) genColName genColType
-      where
-        genColType =
-          QC.oneof [return IntC, return StringC, return DoubleC]
+genSchema = do
+  -- Randomly generate a "pool" of column names to choose from
+  colNamePool <- Vector.fromList <$> genColNamePool
 
--- TODO: rewrite genSchema so that it uses genColNamePool
+  -- Randomly choose an int representing the no. of columns in the schema
+  numCols <- QC.chooseInt (1, length colNamePool)
+
+  -- Choose a prefix of the (ordered) pool of colnames of length numCols
+  let colNames = Vector.toList $ Vector.slice 0 numCols colNamePool
+
+  -- Randomly choose a type for each column
+  colTypes <- QC.vectorOf numCols genColType
+
+  -- Create schema
+  return $ Map.fromList (zip colNames colTypes)
 
 -- Maps each column name to the index for that column
 getColIdxs :: Schema -> Map ColName Int
@@ -230,11 +239,11 @@ genTable schema = do
   let colToIdx = getColIdxs schema
 
   -- colToGenerator :: Map ColName (Gen Column)
-  -- Map from each colname to the generator for that column
+  -- Map each colname to the generator for that column
   let colToGenerator = Map.mapWithKey (\_ cType -> genCol numRows cType) schema
 
   -- idxToGenerator :: Map Int (Gen Column)
-  -- Map from each column index to the generator for that column
+  -- Map each column index to the generator for that column
   let idxToGenerator = colToGenerator `Map.compose` invertMap colToIdx
 
   -- colMap :: Map Int Column
