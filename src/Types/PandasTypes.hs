@@ -45,7 +45,7 @@ data Func
   | Rename (Map ColName ColName)
   | GroupBy [ColName]
   | Aggregate AggFunc ColName
-  | Loc WhereExp -- filtering on rows (akin to WHERE in SQL)
+  | Loc BoolExp -- filtering on rows (akin to WHERE in SQL)
   | Merge MergeExp
   | Unique [ColName]
   | Head Int -- limit no. of rows in output
@@ -60,3 +60,11 @@ data MergeExp = MkMerge
     how :: JoinStyle
   }
   deriving (Show, Eq)
+
+-- Datatype for filtering rows (LOC function in Pandas)
+-- The only unary operators supported are "IS NULL" / "IS NOT NULL",
+data BoolExp
+  = Op1 BoolExp Uop
+  | Op2 BoolExp Bop BoolExp
+  | CompVal Comparable
+  deriving (Eq, Show)

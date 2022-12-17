@@ -69,6 +69,15 @@ data JoinExp = Join
 data Name = T TableName | C ColName
   deriving (Eq, Show)
 
+-- Datatype for filtering rows (WHERE clauses in SQL)
+-- The only unary operators supported are "IS NULL" / "IS NOT NULL",
+-- which are applied postfix in SQL
+data WhereExp
+  = Op1 WhereExp Uop
+  | Op2 WhereExp Bop WhereExp
+  | CompVal Comparable
+  deriving (Eq, Show)
+
 -- TODO: come back to this
 -- QUESTION FOR JOE: Do we need to use the state monad to map table aliases to the acutal table datatype?
 -- `As` operator in SQL

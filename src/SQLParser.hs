@@ -262,10 +262,10 @@ whereExpP = stringP "where" *> logicP
     sumP = prodP `P.chainl1` opAtLevel (level (Arith Plus))
     prodP = uopexpP `P.chainl1` opAtLevel (level (Arith Times))
     uopexpP =
-      (Op1 <$> baseP <*> uopP)
+      (SQL.Op1 <$> baseP <*> uopP)
         <|> baseP
     baseP =
-      CompVal <$> comparableP
+      SQL.CompVal <$> comparableP
         <|> parens logicP
 
 -- >>> P.parse whereExpP "where 1 + true"
@@ -273,7 +273,7 @@ whereExpP = stringP "where" *> logicP
 
 -- | Parse an operator at a specified precedence level (from HW5)
 opAtLevel :: Int -> Parser (WhereExp -> WhereExp -> WhereExp)
-opAtLevel l = flip Op2 <$> P.filter (\x -> level x == l) bopP
+opAtLevel l = flip SQL.Op2 <$> P.filter (\x -> level x == l) bopP
 
 -- | Parses (infix) binary operators
 bopP :: Parser Bop

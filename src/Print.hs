@@ -121,6 +121,14 @@ instance PP Query where
     (Just wher, Just g, Nothing, Nothing) -> pp s <> pp f <> pp wher <> PP.text " group by " <> PP.text (show g)
     (Nothing, Just g, Just o@(cName, or), Nothing) -> pp s <> pp f <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or)
     (Nothing, Nothing, Just o@(cName, or), Just x) -> pp s <> pp f <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or) <> PP.text " limit " <> PP.text (show x)
+    (Nothing, Just g, Nothing, Just x) -> pp s <> pp f <> PP.text " group by " <> PP.text (show g) <> PP.text " limit " <> PP.text (show x)
+    (Nothing, Just g, Just o@(cName, or), Just x) -> pp s <> pp f <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or) <> PP.text " limit " <> PP.text (show x)
+    (Just wher, Nothing, Nothing, Just x) -> pp s <> pp f <> pp wher <> PP.text " limit " <> PP.text (show x)
+    (Just wher, Nothing, Just o@(cName, or), Nothing) -> pp s <> pp f <> pp wher <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or)
+    (Just wher, Nothing, Just o@(cName, or), Just x) -> pp s <> pp f <> pp wher <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or) <> PP.text " limit " <> PP.text (show x)
+    (Just wher, Just g, Nothing, Just x) -> pp s <> pp f <> pp wher <> PP.text " group by " <> PP.text (show g) <> PP.text " limit " <> PP.text (show x)
+    (Just wher, Just g, Just o@(cName, or), Nothing) -> pp s <> pp f <> pp wher <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or)
+    (Just wher, Just g, Just o@(cName, or), Just x) -> pp s <> pp f <> pp wher <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or) <> PP.text " limit " <> PP.text (show x)
 
 listToDoc :: [ColExp] -> Doc
 listToDoc cExps = case cExps of
