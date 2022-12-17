@@ -1080,12 +1080,17 @@ test_dimensions =
     ~: TestList
       [ dimensions (array ((0, 0), (0, 0)) [])
           ~?= (0, 0),
-        dimensions (array ((0, 0), (0, 1)) [((0, 0), Just (IntVal 1))])
-          ~?= (1, 0),
+        dimensions (array ((0, 0), (0, 0)) [((0, 0), Just (IntVal 1))])
+          ~?= (1, 1),
+        dimensions (array ((0, 0), (0, 1)) [((0, 0), Just (IntVal 1)), ((1, 0), Just (IntVal 2))])
+          ~?= (2, 1),
         dimensions
           (array ((0, 0), (3, 0)) [((0, 0), Just (IntVal 3)), ((1, 0), Just (IntVal 1)), ((2, 0), Just (IntVal 3)), ((3, 0), Just (IntVal 4))])
           ~?= (4, 1)
       ]
+
+-- >>> runTestTT test_dimensions
+-- Counts {cases = 4, tried = 4, errors = 1, failures = 2}
 
 -- test_colToValue :: Test
 -- test_colToValue =

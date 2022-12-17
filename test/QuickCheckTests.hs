@@ -225,43 +225,44 @@ getColIdxs :: Schema -> Map ColName Int
 getColIdxs schema =
   Map.mapWithKey (\colName _ -> colName `getColIndex` schema) schema
 
--- Generator for Tables
--- Schema :: Map ColName ColType
+-- Generator that produces a Table adhering to an input schema
+-- If an empty schema is provided, this generator returns the special
+-- QuickCheck discard value (QC.discard)
 genTable :: Schema -> Gen Table
-genTable schema = do
-  -- Compute the no. of columns
-  let numCols = Map.size schema
+genTable schema
+  | schema == Map.empty = return QC.discard
+  | otherwise = do
+    let numCols = Map.size schema
+    -- Arbitrarily generate the no. of rows
+    numRows <- QC.chooseInt (1, 5)
 
-  -- Arbitrarily generate the no. of rows
-  numRows <- QC.chooseInt (1, 5)
+    -- colToIdx :: Map ColName Int
+    -- Map from colnames to indexes
+    let colToIdx = getColIdxs schema
 
-  -- colToIdx :: Map ColName Int
-  -- Map from colnames to indexes
-  let colToIdx = getColIdxs schema
+    -- colToGenerator :: Map ColName (Gen Column)
+    -- Map each colname to the generator for that column
+    let colToGen = Map.mapWithKey (\_ cType -> genCol numRows cType) schema
 
-  -- colToGenerator :: Map ColName (Gen Column)
-  -- Map each colname to the generator for that column
-  let colToGenerator = Map.mapWithKey (\_ cType -> genCol numRows cType) schema
+    -- idxToGenerator :: Map Int (Gen Column)
+    -- Map each column index to the generator for that column
+    let idxToGen = colToGen `Map.compose` invertMap colToIdx
 
-  -- idxToGenerator :: Map Int (Gen Column)
-  -- Map each column index to the generator for that column
-  let idxToGenerator = colToGenerator `Map.compose` invertMap colToIdx
+    -- colMap :: Map Int Column
+    -- Use sequence to pull the Gen out of the Map, then bind to obtain the
+    -- resultant map from indexes to the (randomly generated) columns
+    colMap <- sequence idxToGen
 
-  -- colMap :: Map Int Column
-  -- Use sequence to pull the Gen out of the Map, then bind to obtain the
-  -- resultant map from indexes to the (randomly generated) columns
-  colMap <- sequence idxToGenerator
+    -- cols :: [[Maybe Value]]
+    -- Extract the randomly generated columns from their constructor
+    let cols = [c | col@(Column c) <- map snd (Map.toList colMap)]
 
-  -- cols :: [[Maybe Value]]
-  -- Extract the randomly generated columns from their constructor
-  let cols = [c | col@(Column c) <- map snd (Map.toList colMap)]
+    -- All elements in the table, laid out in row-major format
+    -- elts :: [Maybe Value]
+    let elts = concat (transpose cols)
 
-  -- All elements in the table, laid out in row-major format
-  -- elts :: [Maybe Value]
-  let elts = concat (transpose cols)
-
-  -- Create the Table & use return to create a Generator of Tables
-  return $ listArray ((0, 0), (numRows - 1, numCols - 1)) elts
+    -- Create the Table & use return to create a Generator of Tables
+    return $ listArray ((0, 0), (numRows - 1, numCols - 1)) elts
 
 -- Generates a column of a fixed length containing
 -- Maybe values of a particular type (for 1/8th of the time, generate Nothing)
@@ -305,9 +306,7 @@ genCol colLen colType =
 -- "Wrapper" generators that randomly generates a table schema
 -- & a table that abides by that schema
 genSchemaAndTable :: Gen Table
-genSchemaAndTable = do
-  schema <- genSchema
-  genTable schema
+genSchemaAndTable = genSchema >>= genTable
 
 -- TODO: implement function that figures out if a table accepts a query
 
