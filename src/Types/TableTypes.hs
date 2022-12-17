@@ -59,10 +59,7 @@ getColIndex colName schema =
 --------------------------------------------------------------------------------
 -- CONVENIENCE FUNCTIONS FOR TABLE CONSTRUCTION
 
--- TODO: figure out how to convert list of columns to row major format
-
 -- | Helper function for creating a table
--- https://www.reddit.com/r/haskell/comments/34kqer/comment/cqx2aua/?utm_source=share&utm_medium=web2x&context=3
 mkTable :: (Int, Int) -> [Maybe Value] -> Table
 mkTable = curry listArray (0, 0)
 
@@ -70,39 +67,15 @@ mkTable = curry listArray (0, 0)
 -- mapPair :: (a -> b) -> (a, a) -> (b, b)
 -- mapPair f (a1, a2) = (f a1, f a2)
 
--- | Retrieves a table's dimensions in the form (numRows, numCols)
--- (need to add 1 when computing dimensions since tables are 0-indexed)
--- TODO: figure out dimensions!
+-- | Retrieves a (non-empty) table's dimensions in the form (numRows, numCols)
+-- Need to add one since tables are zero-indexed
 dimensions :: Table -> (Int, Int)
-dimensions table = undefined
+dimensions table =
+  let (numRows, numCols) = (snd . bounds) table
+   in (numRows + 1, numCols + 1)
 
--- case tableToList table of
---   [[]] -> undefined
---   _ -> undefined
--- let (numRows, numCols) = (snd . bounds) table
---  in if numCols == 0
---       then (numRows + 1, numCols + 1)
---       else (numRows + 1, numCols)
-
--- in (numRows, numCols)
-
-t1 :: Table
-t1 = array ((0, 0), (3, 0)) [((0, 0), Just (IntVal 3)), ((1, 0), Just (IntVal 1)), ((2, 0), Just (IntVal 3)), ((3, 0), Just (IntVal 4))]
-
--- >>> tableToList $ array ((0, 0), (0, 0)) []
--- Prelude.undefined
-
--- >>> dimensions t1
--- (4,1)
-
--- >>> dimensions $ array ((0, 0), (0, 0)) []
--- (1,1)
-
--- >>> dimensions (array ((0, 0), (0, 1)) [((0, 0), Just (IntVal 1))])
--- (0,1)
-
--- | Converts a Table to a human-readable 2D list
--- (for the purposes of exporting to a CSV)
+-- | Converts a (non-empty) Table to a human-readable 2D list
+-- (for exporting to a CSV later)
 tableToList :: Table -> [[Maybe Value]]
 tableToList table =
   let (numRows, numCols) = dimensions table

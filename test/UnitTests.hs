@@ -1078,19 +1078,139 @@ test_dimensions :: Test
 test_dimensions =
   "testing fetching table dimensions"
     ~: TestList
-      [ dimensions (array ((0, 0), (0, 0)) [])
-          ~?= (0, 0),
-        dimensions (array ((0, 0), (0, 0)) [((0, 0), Just (IntVal 1))])
-          ~?= (1, 1),
-        dimensions (array ((0, 0), (0, 1)) [((0, 0), Just (IntVal 1)), ((1, 0), Just (IntVal 2))])
-          ~?= (2, 1),
+      [ -- 1x1 table
         dimensions
-          (array ((0, 0), (3, 0)) [((0, 0), Just (IntVal 3)), ((1, 0), Just (IntVal 1)), ((2, 0), Just (IntVal 3)), ((3, 0), Just (IntVal 4))])
-          ~?= (4, 1)
+          ( array
+              ((0, 0), (0, 0))
+              [ ((0, 0), Just (IntVal 1))
+              ]
+          )
+          ~?= (1, 1),
+        -- 2x1 table
+        dimensions
+          ( array
+              ((0, 0), (1, 0))
+              [ ((0, 0), Just (IntVal 1)),
+                ((1, 0), Just (IntVal 2))
+              ]
+          )
+          ~?= (2, 1),
+        -- 1x2 table
+        dimensions
+          ( array
+              ((0, 0), (0, 1))
+              [ ((0, 0), Just (IntVal 1)),
+                ((0, 1), Just (IntVal 2))
+              ]
+          )
+          ~?= (1, 2),
+        -- 2x2 table
+        dimensions
+          ( array
+              ((0, 0), (1, 1))
+              [ ((0, 0), Just (StringVal "(0, 0)")),
+                ((1, 0), Just (StringVal "(1, 0)")),
+                ((0, 1), Just (StringVal "(0, 1)")),
+                ((1, 1), Just (StringVal "(1, 1)"))
+              ]
+          )
+          ~?= (2, 2),
+        -- 4x1 table
+        dimensions
+          ( array
+              ((0, 0), (3, 0))
+              [ ((0, 0), Just (IntVal 3)),
+                ((1, 0), Just (IntVal 1)),
+                ((2, 0), Just (IntVal 3)),
+                ((3, 0), Just (IntVal 4))
+              ]
+          )
+          ~?= (4, 1),
+        -- 2x3 table
+        dimensions
+          ( array
+              ((0, 0), (1, 2))
+              [ ((0, 0), Just (StringVal "(0, 0)")),
+                ((1, 0), Just (StringVal "(1, 0)")),
+                ((0, 1), Just (StringVal "(0, 1)")),
+                ((1, 1), Just (StringVal "(1, 1)")),
+                ((0, 2), Just (StringVal "(0, 2)")),
+                ((1, 2), Just (StringVal "(1, 2)"))
+              ]
+          )
+          ~?= (2, 3)
       ]
 
--- >>> runTestTT test_dimensions
--- Counts {cases = 4, tried = 4, errors = 1, failures = 2}
+test_tableToList :: Test
+test_tableToList =
+  "testing tableToList"
+    ~: TestList
+      [ -- 1x2 table
+        tableToList
+          ( array
+              ((0, 0), (0, 1))
+              [ ((0, 0), Just (IntVal 1)),
+                ((0, 1), Just (IntVal 2))
+              ]
+          )
+          ~?= [[Just (IntVal 1), Just (IntVal 2)]],
+        -- 2x1 table
+        tableToList
+          ( array
+              ((0, 0), (1, 0))
+              [ ((0, 0), Just (IntVal 1)),
+                ((1, 0), Just (IntVal 2))
+              ]
+          )
+          ~?= [[Just (IntVal 1)], [Just (IntVal 2)]],
+        -- 4x1 table
+        tableToList
+          ( array
+              ((0, 0), (3, 0))
+              [ ((0, 0), Just (IntVal 3)),
+                ((1, 0), Just (IntVal 1)),
+                ((2, 0), Just (IntVal 3)),
+                ((3, 0), Just (IntVal 4))
+              ]
+          )
+          ~?= [ [Just (IntVal 3)],
+                [Just (IntVal 1)],
+                [Just (IntVal 3)],
+                [Just (IntVal 4)]
+              ],
+        -- 2x2 table
+        tableToList
+          ( array
+              ((0, 0), (1, 1))
+              [ ((0, 0), Just (StringVal "(0, 0)")),
+                ((1, 0), Just (StringVal "(1, 0)")),
+                ((0, 1), Just (StringVal "(0, 1)")),
+                ((1, 1), Just (StringVal "(1, 1)"))
+              ]
+          )
+          ~?= [[Just (StringVal "(0, 0)"), Just (StringVal "(0, 1)")], [Just (StringVal "(1, 0)"), Just (StringVal "(1, 1)")]],
+        -- 2x3 table
+        tableToList
+          ( array
+              ((0, 0), (1, 2))
+              [ ((0, 0), Just (StringVal "(0, 0)")),
+                ((1, 0), Just (StringVal "(1, 0)")),
+                ((0, 1), Just (StringVal "(0, 1)")),
+                ((1, 1), Just (StringVal "(1, 1)")),
+                ((0, 2), Just (StringVal "(0, 2)")),
+                ((1, 2), Just (StringVal "(1, 2)"))
+              ]
+          )
+          ~?= [ [ Just (StringVal "(0, 0)"),
+                  Just (StringVal "(0, 1)"),
+                  Just (StringVal "(0, 2)")
+                ],
+                [ Just (StringVal "(1, 0)"),
+                  Just (StringVal "(1, 1)"),
+                  Just (StringVal "(1, 2)")
+                ]
+              ]
+      ]
 
 -- test_colToValue :: Test
 -- test_colToValue =

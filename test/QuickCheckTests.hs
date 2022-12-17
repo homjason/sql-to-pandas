@@ -225,8 +225,8 @@ getColIdxs :: Schema -> Map ColName Int
 getColIdxs schema =
   Map.mapWithKey (\colName _ -> colName `getColIndex` schema) schema
 
--- Generator that produces a Table adhering to an input schema
--- If an empty schema is provided, this generator returns the special
+-- Generator that produces a non-empty Table adhering to an input Schema
+-- If an empty Schema is provided, this generator returns the special
 -- QuickCheck discard value (QC.discard)
 genTable :: Schema -> Gen Table
 genTable schema
