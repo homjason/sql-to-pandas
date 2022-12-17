@@ -29,6 +29,7 @@ import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
 
+-- Generator for SELECT expressions
 genSelectExp :: Gen SelectExp
 genSelectExp =
   QC.oneof
@@ -36,13 +37,16 @@ genSelectExp =
       DistinctCols <$> QC.resize 3 (QC.listOf1 genColExp),
       return Star
     ]
+  where
+    -- Generator for columns / aggregate functions in SELECT expressions
+    genColExp :: Gen ColExp
+    genColExp = QC.oneof [Col <$> genColName, genAgg]
 
-genColExp :: Gen ColExp
-genColExp =
-  QC.oneof
-    [ Col <$> genColName,
-      genAgg
-    ]
+    -- Generator for Aggregate Function Expressions in SELECT
+    genAgg :: Gen ColExp
+    genAgg = do
+      fn <- arbitrary
+      Agg fn <$> genColName
 
 -- Generator for column names
 genColName :: Gen ColName
@@ -51,12 +55,6 @@ genColName = QC.elements colNames
 -- Generator for table names
 genTableName :: Gen TableName
 genTableName = QC.elements tableNames
-
--- Generator for Aggregate Function Expressions in SELECT
-genAgg :: Gen ColExp
-genAgg = do
-  fn <- arbitrary
-  Agg fn <$> genColName
 
 -- Generator for FROM expressions
 genFromExp :: Gen FromExp
@@ -188,20 +186,12 @@ instance Arbitrary Order where
   arbitrary = QC.arbitraryBoundedEnum
 
 -------------------------------------------------------------------------------
+-- Generator for Tables
 
 -- Maps each column name to the index for that column
 getColIdxs :: Schema -> Map ColName Int
 getColIdxs schema =
   Map.mapWithKey (\colName _ -> colName `getColIndex` schema) schema
-
-testSchema :: Schema
-testSchema = mkSchema [("bill", IntC), ("day", StringC)]
-
-t :: Table
-t = array ((0, 0), (4, 1)) [((0, 0), Just (IntVal 4)), ((0, 1), Just (StringVal "dc")), ((1, 0), Just (IntVal 3)), ((1, 1), Just (StringVal "bcaca")), ((2, 0), Just (IntVal 0)), ((2, 1), Just (StringVal "a")), ((3, 0), Just (IntVal 4)), ((3, 1), Just (StringVal "bd")), ((4, 0), Just (IntVal 1)), ((4, 1), Just (StringVal "cd"))]
-
--- >>> tableToList t
--- [[Just (IntVal 4)],[Just (IntVal 3)],[Just (IntVal 0)],[Just (IntVal 4)]]
 
 -- Generator for Tables
 -- Schema :: Map ColName ColType
@@ -230,10 +220,12 @@ genTable schema = do
   -- resultant map from indexes to the (randomly generated) columns
   colMap <- sequence idxToGenerator
 
+  -- cols :: [[Maybe Value]]
   -- Extract the randomly generated columns from their constructor
   let cols = [c | col@(Column c) <- map snd (Map.toList colMap)]
 
   -- All elements in the table, laid out in row-major format
+  -- elts :: [Maybe Value]
   let elts = concat (transpose cols)
 
   -- Create the Table & use return to create a Generator of Tables
@@ -277,6 +269,10 @@ genCol colLen colType =
               (7, Just . DoubleVal <$> genSmallDouble)
             ]
         )
+
+-- TODO: implement function that figures out if a table accepts a query
+
+-- TODO: generate queries that are accepted by a table
 
 --------------------------------------------------------------------------------
 

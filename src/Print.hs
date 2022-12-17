@@ -6,6 +6,7 @@ import Data.Char qualified as Char
 import Data.List
 import Data.Map (Map)
 import Data.Map qualified as Map
+import Data.Maybe
 import Test.HUnit
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
@@ -112,7 +113,14 @@ instance PP Pandas.Command where
 -}
 instance PP Query where
   pp (Query s f w gb ob l) = case (w, gb, ob, l) of
-    (Nothing, Nothing, Nothing, Nothing) -> undefined
+    (Nothing, Nothing, Nothing, Nothing) -> pp s <> pp f
+    (Just wher, Nothing, Nothing, Nothing) -> pp s <> pp f <> pp wher
+    (Nothing, Just g, Nothing, Nothing) -> pp s <> pp f <> PP.text " group by " <> PP.text (show g)
+    (Nothing, Nothing, Just o@(cName, or), Nothing) -> pp s <> pp f <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or)
+    (Nothing, Nothing, Nothing, Just x) -> pp s <> pp f <> PP.text " limit " <> PP.text (show x)
+    (Just wher, Just g, Nothing, Nothing) -> pp s <> pp f <> pp wher <> PP.text " group by " <> PP.text (show g)
+    (Nothing, Just g, Just o@(cName, or), Nothing) -> pp s <> pp f <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or)
+    (Nothing, Nothing, Just o@(cName, or), Just x) -> pp s <> pp f <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or) <> PP.text " limit " <> PP.text (show x)
 
 listToDoc :: [ColExp] -> Doc
 listToDoc cExps = case cExps of
