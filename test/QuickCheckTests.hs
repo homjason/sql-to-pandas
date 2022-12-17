@@ -16,6 +16,7 @@ import Data.Map qualified as Map
 import Data.Maybe (catMaybes, isNothing)
 import Data.Set (Set)
 import Data.Set qualified as Set
+import Data.Vector qualified as Vector
 import Parser (Parser)
 import Parser qualified as P
 import Print
@@ -48,9 +49,17 @@ genSelectExp =
       fn <- arbitrary
       Agg fn <$> genColName
 
--- Generator for column names
+-- Generator for an individual column name (taken from a colname pool)
 genColName :: Gen ColName
-genColName = QC.elements colNames
+genColName = do
+  colNames <- genColNamePool
+  QC.elements colNames
+
+-- Generator for the pool of column names ("col0", "col1", etc.)
+genColNamePool :: Gen [ColName]
+genColNamePool = do
+  numCols <- QC.chooseInt (1, 4)
+  return ["col" ++ show i | i <- [0 .. numCols - 1]]
 
 -- Generator for table names
 genTableName :: Gen TableName
@@ -186,7 +195,20 @@ instance Arbitrary Order where
   arbitrary = QC.arbitraryBoundedEnum
 
 -------------------------------------------------------------------------------
--- Generator for Tables
+-- Generator for Schemas & Tables
+
+-- Generator for schemas
+genSchema :: Gen Schema
+genSchema = Map.fromList <$> genSchemaPairs
+  where
+    -- Generates a list of (ColName, ColType) pairs
+    genSchemaPairs :: Gen [(ColName, ColType)]
+    genSchemaPairs = QC.listOf1 $ liftM2 (,) genColName genColType
+      where
+        genColType =
+          QC.oneof [return IntC, return StringC, return DoubleC]
+
+-- TODO: rewrite genSchema so that it uses genColNamePool
 
 -- Maps each column name to the index for that column
 getColIdxs :: Schema -> Map ColName Int
@@ -317,7 +339,7 @@ getPandasTable = undefined
 
 -- List of permitted colnames
 colNames :: [ColName]
-colNames = ["total_bill", "tip", "day", "party_size"]
+colNames = ["col0", "col1", "col2", "col3", "col4"]
 
 -- List of permitted TableNames
 tableNames :: [TableName]

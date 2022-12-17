@@ -85,10 +85,6 @@ tableToList table =
 mkSchema :: [(ColName, ColType)] -> Map ColName ColType
 mkSchema = Map.fromList
 
--- | Given a schema, creates a table with that schema
-schemaToTable :: Schema -> Table
-schemaToTable schema = undefined
-
 -- | Inverts the keys & values of a (one-to-one) Map
 invertMap :: Ord v => Map k v -> Map v k
 invertMap = Map.fromList . map (\(k, v) -> (v, k)) . Map.toList
