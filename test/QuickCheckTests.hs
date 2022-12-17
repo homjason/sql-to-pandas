@@ -27,7 +27,6 @@ import Test.QuickCheck qualified as Qc
 import Translator
 import Types.PandasTypes
 import Types.SQLTypes
--- import Types.TableTypes
 import Types.TableTypes
 import Types.Types
 
@@ -220,11 +219,6 @@ genSchema = do
   -- Create schema
   return $ Map.fromList (zip colNames colTypes)
 
--- Maps each column name to the index for that column
-getColIdxs :: Schema -> Map ColName Int
-getColIdxs schema =
-  Map.mapWithKey (\colName _ -> colName `getColIndex` schema) schema
-
 -- Generator that produces a non-empty Table adhering to an input Schema
 -- If an empty Schema is provided, this generator returns the special
 -- QuickCheck discard value (QC.discard)
@@ -260,6 +254,8 @@ genTable schema
     -- All elements in the table, laid out in row-major format
     -- elts :: [Maybe Value]
     let elts = concat (transpose cols)
+
+    -- TODO: need to figure out a way of mapping colnames to each cell in a row
 
     -- Create the Table & use return to create a Generator of Tables
     return $ listArray ((0, 0), (numRows - 1, numCols - 1)) elts
@@ -303,14 +299,21 @@ genCol colLen colType =
             ]
         )
 
--- "Wrapper" generators that randomly generates a table schema
+-- | "Wrapper" generator that randomly generates a table schema
 -- & a table that abides by that schema
 genSchemaAndTable :: Gen Table
 genSchemaAndTable = genSchema >>= genTable
 
--- TODO: implement function that figures out if a table accepts a query
+-- >>> QC.sample' genSchema
+-- [fromList [("col0",StringC)],fromList [("col0",StringC)],fromList [("col0",StringC)],fromList [("col0",StringC),("col1",DoubleC)],fromList [("col0",DoubleC)],fromList [("col0",DoubleC)],fromList [("col0",IntC),("col1",IntC),("col2",IntC)],fromList [("col0",StringC)],fromList [("col0",StringC),("col1",IntC),("col2",StringC)],fromList [("col0",DoubleC),("col1",StringC),("col2",StringC),("col3",IntC)],fromList [("col0",StringC)]]
 
--- TODO: generate queries that are accepted by a table
+-- | Given a table, decide if a particular query is accepted by the table
+accept :: Table -> Query -> Bool
+accept table (Query s f w gb ob l) = undefined
+
+-- | Generator for queries that are accepted by a given table
+genTableQuery :: Table -> Query
+genTableQuery = undefined "TODO"
 
 --------------------------------------------------------------------------------
 

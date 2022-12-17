@@ -8,6 +8,8 @@ import Data.Foldable (toList)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.String (IsString (..))
+import Data.Vector (Vector)
+import Data.Vector qualified as Vector
 import Test.QuickCheck
 import Types.Types
 
@@ -63,10 +65,6 @@ getColIndex colName schema =
 mkTable :: (Int, Int) -> [Maybe Value] -> Table
 mkTable = curry listArray (0, 0)
 
--- | Equivalent of "map" for pairs consisting of the same type
--- mapPair :: (a -> b) -> (a, a) -> (b, b)
--- mapPair f (a1, a2) = (f a1, f a2)
-
 -- | Retrieves a (non-empty) table's dimensions in the form (numRows, numCols)
 -- Need to add one since tables are zero-indexed
 dimensions :: Table -> (Int, Int)
@@ -80,6 +78,34 @@ tableToList :: Table -> [[Maybe Value]]
 tableToList table =
   let (numRows, numCols) = dimensions table
    in [[table ! (i, j) | j <- [0 .. numCols - 1]] | i <- [0 .. numRows - 1]]
+
+-- Maps each column name to the index for that column
+getColIdxs :: Schema -> Map ColName Int
+getColIdxs schema =
+  Map.mapWithKey (\colName _ -> colName `getColIndex` schema) schema
+
+-- | Given a schema & a table,
+-- maps each colname to the particular column in the table
+getColOfTable :: Schema -> Table -> Map ColName Column
+getColOfTable schema table =
+  let (colnames, colToIdx) = (Map.keys schema, getColIdxs schema)
+      idxEltPairs = assocs table
+      (numRows, numCols) = dimensions table
+   in Map.mapWithKey
+        ( \colName colIdx ->
+            Column [elt | ((row, col), elt) <- idxEltPairs, col == colIdx]
+        )
+        colToIdx
+
+----- EXAMPLES
+schema :: Schema
+schema = Map.fromList [("col0", IntC), ("col1", StringC)]
+
+table :: Table
+table = array ((0, 0), (1, 1)) [((0, 0), Just (IntVal 0)), ((0, 1), Just (StringVal "ab")), ((1, 0), Just (IntVal 4)), ((1, 1), Just (StringVal "cd"))]
+
+-- >>> getColOfTable schema table
+-- fromList [("col0",Column [Just (IntVal 0),Just (IntVal 4)]),("col1",Column [Just (StringVal "ab"),Just (StringVal "cd")])]
 
 --------------------------------------------------------------------------------
 -- CONVENIENCE FUNCTIONS FOR SCHEMA CONSTRUCTION
