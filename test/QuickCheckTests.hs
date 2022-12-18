@@ -166,19 +166,12 @@ instance Arbitrary Schema where
   shrink :: Schema -> [Schema]
   shrink schema = shrinkSchema schema
 
--- TODO: figure out how to shrink schemas
+-- | Shrinker for schemas
 shrinkSchema :: Schema -> [Schema]
-shrinkSchema schema =
-  let assocs = Map.toList schema
-      shrunkNames :: [[ColName]]
-      shrunkNames = shrink (map fst assocs)
-
-      shrunkTypes :: [[ColType]]
-      shrunkTypes = shrink (map snd assocs)
-
-      shrunkAssocs :: [[(ColName, ColType)]]
-      shrunkAssocs = undefined "map (\ns ts -> zip ns ts) (zip shrunkTypes shrunkNames)"
-   in map Map.fromList shrunkAssocs
+shrinkSchema schema = do
+  (colName, colType) <- Map.toList schema
+  shrunkType <- shrink colType
+  return $ Map.singleton colName shrunkType
 
 -- | Generator for schemas
 genSchema :: Gen Schema
@@ -398,23 +391,57 @@ genSelectExp schema =
 
 -- | Generator for WHERE expressions based on a given schema
 genWhereExp :: Schema -> Gen WhereExp
-genWhereExp schema = QC.sized aux
+genWhereExp schema =
+  QC.oneof
+    [ liftM2 Op1 (CompVal <$> genColNameComparable) arbitrary,
+      genOp2,
+      -- liftM3 Op2 (aux (n - 1)) genBop (aux (n - 1)),
+      CompVal <$> genComparable
+    ]
   where
-    aux 0 = CompVal <$> genComparable schema
-    aux n =
+    -- Generator for Comparable values
+    genComparable :: Gen Comparable
+    genComparable =
       QC.oneof
-        [ liftM2 Op1 (aux (n - 1)) arbitrary,
-          liftM3 Op2 (aux (n - 1)) genBop (aux (n - 1)),
-          CompVal <$> genComparable schema
+        [ genColNameComparable,
+          genCompNum,
+          LitString <$> genSmallString
         ]
 
-    -- Generator for Comparable values
-    genComparable :: Schema -> Gen Comparable
-    genComparable schema =
+    genOp2 :: Gen WhereExp
+    genOp2 = do
+      bop <- genBop
+      case bop of
+        Arith _ ->
+          liftM3
+            Op2
+            (CompVal <$> genCompNum)
+            (return bop)
+            (CompVal <$> genCompNum)
+        Comp bop' ->
+          liftM3
+            Op2
+            (CompVal <$> genComparable)
+            (return bop)
+            (CompVal <$> genComparable)
+        Logic bop' -> liftM3 Op2 genCompOpExp (return bop) genCompOpExp
+
+    genCompOpExp :: Gen WhereExp
+    genCompOpExp = do
+      compOp <- (arbitrary :: Gen CompOp)
+      liftM3
+        Op2
+        (CompVal <$> genComparable)
+        (return (Comp compOp))
+        (CompVal <$> genComparable)
+
+    genColNameComparable :: Gen Comparable
+    genColNameComparable = ColName <$> genColName schema
+
+    genCompNum :: Gen Comparable
+    genCompNum =
       QC.oneof
-        [ ColName <$> genColName schema,
-          LitInt <$> genSmallInt,
-          LitString <$> genSmallString,
+        [ LitInt <$> genSmallInt,
           LitDouble <$> genSmallDouble
         ]
 
