@@ -25,6 +25,15 @@ import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
 
+-- | Takes a generator w/ type Gen a, and returns a generator of Maybe a
+-- that generates Nothing 1/8th of the time
+sometimesGenNothing :: Gen a -> Gen (Maybe a)
+sometimesGenNothing g =
+  QC.frequency
+    [ (1, return Nothing),
+      (7, Just <$> g)
+    ]
+
 -- Generator for the pool of column names ("col0", "col1", etc.)
 genColNamePool :: Gen [ColName]
 genColNamePool = do
@@ -230,33 +239,15 @@ genCol colLen colType =
   where
     genIntCol :: Int -> Gen [Maybe Value]
     genIntCol colLen =
-      QC.vectorOf
-        colLen
-        ( QC.frequency
-            [ (1, return Nothing),
-              (7, Just . IntVal <$> genSmallInt)
-            ]
-        )
+      QC.vectorOf colLen $ sometimesGenNothing (IntVal <$> genSmallInt)
 
     genStringCol :: Int -> Gen [Maybe Value]
     genStringCol colLen =
-      QC.vectorOf
-        colLen
-        ( QC.frequency
-            [ (1, return Nothing),
-              (7, Just . StringVal <$> genSmallString)
-            ]
-        )
+      QC.vectorOf colLen $ sometimesGenNothing (StringVal <$> genSmallString)
 
     genDoubleCol :: Int -> Gen [Maybe Value]
     genDoubleCol colLen =
-      QC.vectorOf
-        colLen
-        ( QC.frequency
-            [ (1, return Nothing),
-              (7, Just . DoubleVal <$> genSmallDouble)
-            ]
-        )
+      QC.vectorOf colLen $ sometimesGenNothing (DoubleVal <$> genSmallDouble)
 
 -- | "Wrapper" generator that randomly generates a table schema
 -- & a table that abides by that schema
@@ -265,7 +256,8 @@ genSchemaAndTable = genSchema >>= genTable
 
 -- TODO: reread State monad lecture notes to figure out JoinExps
 
--- | Given a (table, schema) pair, decide if a particular query is accepted by the table
+-- | Given a (table, schema) pair,
+-- decide if a particular query is accepted by the table
 accept :: (Table, Schema) -> Query -> Bool
 accept (table, schema) (Query s f w gb ob l) =
   checkSelect schema s
@@ -329,13 +321,16 @@ accept (table, schema) (Query s f w gb ob l) =
 -- | Generator for queries that are accepted by a given (schema, table) pair
 genTableQuery :: (Schema, Table) -> Gen Query
 genTableQuery (schema, table) = do
+  let (numRows, _) = dimensions table
   select <- genSelectExp schema
   from <- genFromExp
-  wher <- genWhereExp schema
-  groupBy <- genGroupBy schema
-
-  -- TODO: delete dummy return statement below
-  return QC.discard
+  wher <- sometimesGenNothing $ genWhereExp schema
+  groupBy <- sometimesGenNothing $ genGroupBy schema
+  orderBy <-
+    sometimesGenNothing $
+      liftM2 (,) (genColName schema) (arbitrary :: Gen Order)
+  limit <- sometimesGenNothing $ QC.chooseInt (1, numRows)
+  return $ Query select from wher groupBy orderBy limit
 
 -- | Only generate column names in a particular schema
 genColName :: Schema -> Gen ColName
@@ -343,7 +338,7 @@ genColName schema =
   let colNames = Map.keys schema
    in QC.elements colNames
 
--- Generator for SELECT expressions (NEW)
+-- | Generator for SELECT expressions based on a given schema
 genSelectExp :: Schema -> Gen SelectExp
 genSelectExp schema =
   QC.oneof
@@ -374,7 +369,7 @@ genSelectExp schema =
           fn <- arbitrary
           Agg fn <$> genColName schema
 
--- Generator for WHERE expressions (NEW)
+-- | Generator for WHERE expressions based on a given schema
 genWhereExp :: Schema -> Gen WhereExp
 genWhereExp schema = QC.sized aux
   where
@@ -396,16 +391,14 @@ genWhereExp schema = QC.sized aux
           LitDouble <$> genSmallDouble
         ]
 
--- | Generator that pipelines the process of generating a schema, then a table,
--- then a query (making sure that all three of them cohere)
-genSchemaTableQuery :: Gen Query
+-- | Generator that generates a (schema, table, query) triple
+genSchemaTableQuery :: Gen (Schema, Table, Query)
 genSchemaTableQuery = do
   schema <- genSchema
   table <- genTable schema
-  genTableQuery (schema, table)
+  query <- genTableQuery (schema, table)
+  return (schema, table, query)
 
--- >>> :t S.runState
--- S.runState :: State s a -> s -> (a, s)
 --------------------------------------------------------------------------------
 
 -- | Generate a small set of names for generated tests. These names are guaranteed to not include
