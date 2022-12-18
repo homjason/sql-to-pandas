@@ -31,11 +31,11 @@ test_comparableP :: Test
 test_comparableP =
   "parsing Comparable values"
     ~: TestList
-      [ P.parse comparableP "col" ~?= Right (ColName "col"),
-        P.parse comparableP "52" ~?= Right (LitInt 52),
-        P.parse comparableP "-4" ~?= Right (LitInt (-4)),
-        P.parse comparableP "100       " ~?= Right (LitInt 100),
-        P.parse comparableP "\"string literal\"" ~?= Right (LitString "string literal")
+      [ P.parse comparableP "col" ~?= Right (SQL.ColName "col"),
+        P.parse comparableP "52" ~?= Right (SQL.LitInt 52),
+        P.parse comparableP "-4" ~?= Right (SQL.LitInt (-4)),
+        P.parse comparableP "100       " ~?= Right (SQL.LitInt 100),
+        P.parse comparableP "\"string literal\"" ~?= Right (SQL.LitString "string literal")
       ]
 
 test_selectExpP :: Test
@@ -105,190 +105,190 @@ test_whereExpP =
         P.parse whereExpP "where 1 + 2"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (LitInt 1))
-                (Arith Plus)
-                (SQL.CompVal (LitInt 2))
+                (SQL.CompVal (SQL.LitInt 1))
+                (SQL.Arith Plus)
+                (SQL.CompVal (SQL.LitInt 2))
             ),
         P.parse whereExpP "where (1) + (2)"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (LitInt 1))
-                (Arith Plus)
-                (SQL.CompVal (LitInt 2))
+                (SQL.CompVal (SQL.LitInt 1))
+                (SQL.Arith Plus)
+                (SQL.CompVal (SQL.LitInt 2))
             ),
         P.parse whereExpP "where 1 * 2"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (LitInt 1))
-                (Arith Times)
-                (SQL.CompVal (LitInt 2))
+                (SQL.CompVal (SQL.LitInt 1))
+                (SQL.Arith Times)
+                (SQL.CompVal (SQL.LitInt 2))
             ),
         P.parse whereExpP "where 1*2"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (LitInt 1))
-                (Arith Times)
-                (SQL.CompVal (LitInt 2))
+                (SQL.CompVal (SQL.LitInt 1))
+                (SQL.Arith Times)
+                (SQL.CompVal (SQL.LitInt 2))
             ),
         P.parse whereExpP "where     2          *   3"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (LitInt 2))
-                (Arith Times)
-                (SQL.CompVal (LitInt 3))
+                (SQL.CompVal (SQL.LitInt 2))
+                (SQL.Arith Times)
+                (SQL.CompVal (SQL.LitInt 3))
             ),
         P.parse whereExpP "where 4 / 2"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (LitInt 4))
-                (Arith Divide)
-                (SQL.CompVal (LitInt 2))
+                (SQL.CompVal (SQL.LitInt 4))
+                (SQL.Arith Divide)
+                (SQL.CompVal (SQL.LitInt 2))
             ),
         P.parse whereExpP "where 3 - 2"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (LitInt 3))
-                (Arith Minus)
-                (SQL.CompVal (LitInt 2))
+                (SQL.CompVal (SQL.LitInt 3))
+                (SQL.Arith Minus)
+                (SQL.CompVal (SQL.LitInt 2))
             ),
         P.parse whereExpP "where 1 < 2"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (LitInt 1))
-                (Comp Lt)
-                (SQL.CompVal (LitInt 2))
+                (SQL.CompVal (SQL.LitInt 1))
+                (SQL.Comp SQL.Lt)
+                (SQL.CompVal (SQL.LitInt 2))
             ),
         P.parse whereExpP "where col > 0"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (ColName "col"))
-                (Comp Gt)
-                (SQL.CompVal (LitInt 0))
+                (SQL.CompVal (SQL.ColName "col"))
+                (SQL.Comp SQL.Gt)
+                (SQL.CompVal (SQL.LitInt 0))
             ),
         P.parse whereExpP "where col < 1"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (ColName "col"))
-                (Comp Lt)
-                (SQL.CompVal (LitInt 1))
+                (SQL.CompVal (SQL.ColName "col"))
+                (SQL.Comp SQL.Lt)
+                (SQL.CompVal (SQL.LitInt 1))
             ),
         P.parse whereExpP "where col = \"hello\""
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (ColName "col"))
-                (Comp Eq)
-                (SQL.CompVal (LitString "hello"))
+                (SQL.CompVal (SQL.ColName "col"))
+                (SQL.Comp SQL.Eq)
+                (SQL.CompVal (SQL.LitString "hello"))
             ),
         P.parse whereExpP "where col != \"invalid\""
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (ColName "col"))
-                (Comp Neq)
-                (SQL.CompVal (LitString "invalid"))
+                (SQL.CompVal (SQL.ColName "col"))
+                (SQL.Comp SQL.Neq)
+                (SQL.CompVal (SQL.LitString "invalid"))
             ),
         P.parse whereExpP "where col = 5"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (ColName "col"))
-                (Comp Eq)
-                (SQL.CompVal (LitInt 5))
+                (SQL.CompVal (SQL.ColName "col"))
+                (SQL.Comp SQL.Eq)
+                (SQL.CompVal (SQL.LitInt 5))
             ),
         P.parse whereExpP "where col != 0"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (ColName "col"))
-                (Comp Neq)
-                (SQL.CompVal (LitInt 0))
+                (SQL.CompVal (SQL.ColName "col"))
+                (SQL.Comp SQL.Neq)
+                (SQL.CompVal (SQL.LitInt 0))
             ),
         P.parse whereExpP "where col1 != col2"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (ColName "col1"))
-                (Comp Neq)
-                (SQL.CompVal (ColName "col2"))
+                (SQL.CompVal (SQL.ColName "col1"))
+                (SQL.Comp SQL.Neq)
+                (SQL.CompVal (SQL.ColName "col2"))
             ),
         P.parse whereExpP "where col is null"
-          ~?= Right (SQL.Op1 (SQL.CompVal (ColName "col")) IsNull),
+          ~?= Right (SQL.Op1 (SQL.CompVal (SQL.ColName "col")) SQL.IsNull),
         P.parse whereExpP "where col is not null"
-          ~?= Right (SQL.Op1 (SQL.CompVal (ColName "col")) IsNotNull),
+          ~?= Right (SQL.Op1 (SQL.CompVal (SQL.ColName "col")) SQL.IsNotNull),
         P.parse whereExpP "where col              is null"
-          ~?= Right (SQL.Op1 (SQL.CompVal (ColName "col")) IsNull),
+          ~?= Right (SQL.Op1 (SQL.CompVal (SQL.ColName "col")) SQL.IsNull),
         P.parse whereExpP "where col > 5"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (ColName "col"))
-                (Comp Gt)
-                (SQL.CompVal (LitInt 5))
+                (SQL.CompVal (SQL.ColName "col"))
+                (SQL.Comp SQL.Gt)
+                (SQL.CompVal (SQL.LitInt 5))
             ),
         P.parse whereExpP "where col                <= 5"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (ColName "col"))
-                (Comp Le)
-                (SQL.CompVal (LitInt 5))
+                (SQL.CompVal (SQL.ColName "col"))
+                (SQL.Comp SQL.Le)
+                (SQL.CompVal (SQL.LitInt 5))
             ),
         P.parse whereExpP "where col + 1 = 2"
           ~?= Right
             ( SQL.Op2
-                (SQL.Op2 (SQL.CompVal (ColName "col")) (Arith Plus) (SQL.CompVal (LitInt 1)))
-                (Comp Eq)
-                (SQL.CompVal (LitInt 2))
+                (SQL.Op2 (SQL.CompVal (SQL.ColName "col")) (SQL.Arith Plus) (SQL.CompVal (SQL.LitInt 1)))
+                (SQL.Comp SQL.Eq)
+                (SQL.CompVal (SQL.LitInt 2))
             ),
         P.parse whereExpP "where (col1 is null) and (col2 is not null)"
           ~?= Right
             ( SQL.Op2
-                (SQL.Op1 (SQL.CompVal (ColName "col1")) IsNull)
-                (Logic And)
-                (SQL.Op1 (SQL.CompVal (ColName "col2")) IsNotNull)
+                (SQL.Op1 (SQL.CompVal (SQL.ColName "col1")) SQL.IsNull)
+                (SQL.Logic SQL.And)
+                (SQL.Op1 (SQL.CompVal (SQL.ColName "col2")) SQL.IsNotNull)
             ),
         P.parse whereExpP "where (col1 is null) or (col2 >= 0)"
           ~?= Right
             ( SQL.Op2
-                (SQL.Op1 (SQL.CompVal (ColName "col1")) IsNull)
-                (Logic Or)
-                (SQL.Op2 (SQL.CompVal (ColName "col2")) (Comp Ge) (SQL.CompVal (LitInt 0)))
+                (SQL.Op1 (SQL.CompVal (SQL.ColName "col1")) SQL.IsNull)
+                (SQL.Logic SQL.Or)
+                (SQL.Op2 (SQL.CompVal (SQL.ColName "col2")) (SQL.Comp SQL.Ge) (SQL.CompVal (SQL.LitInt 0)))
             ),
         P.parse whereExpP "where (col1 / col2) and (col2 != 0)"
           ~?= Right
             ( SQL.Op2
-                (SQL.Op2 (SQL.CompVal (ColName "col1")) (Arith Divide) (SQL.CompVal (ColName "col2")))
-                (Logic And)
-                (SQL.Op2 (SQL.CompVal (ColName "col2")) (Comp Neq) (SQL.CompVal (LitInt 0)))
+                (SQL.Op2 (SQL.CompVal (SQL.ColName "col1")) (SQL.Arith Divide) (SQL.CompVal (SQL.ColName "col2")))
+                (SQL.Logic SQL.And)
+                (SQL.Op2 (SQL.CompVal (SQL.ColName "col2")) (SQL.Comp SQL.Neq) (SQL.CompVal (SQL.LitInt 0)))
             ),
         P.parse whereExpP "where col1 + col2 > 3"
           ~?= Right
             ( SQL.Op2
-                (SQL.Op2 (SQL.CompVal (ColName "col1")) (Arith Plus) (SQL.CompVal (ColName "col2")))
-                (Comp Gt)
-                (SQL.CompVal (LitInt 3))
+                (SQL.Op2 (SQL.CompVal (SQL.ColName "col1")) (SQL.Arith Plus) (SQL.CompVal (SQL.ColName "col2")))
+                (SQL.Comp SQL.Gt)
+                (SQL.CompVal (SQL.LitInt 3))
             ),
         P.parse whereExpP "where col1 - col2 = col3 - col4"
           ~?= Right
             ( SQL.Op2
-                (SQL.Op2 (SQL.CompVal (ColName "col1")) (Arith Minus) (SQL.CompVal (ColName "col2")))
-                (Comp Eq)
-                (SQL.Op2 (SQL.CompVal (ColName "col3")) (Arith Minus) (SQL.CompVal (ColName "col4")))
+                (SQL.Op2 (SQL.CompVal (SQL.ColName "col1")) (SQL.Arith Minus) (SQL.CompVal (SQL.ColName "col2")))
+                (SQL.Comp SQL.Eq)
+                (SQL.Op2 (SQL.CompVal (SQL.ColName "col3")) (SQL.Arith Minus) (SQL.CompVal (SQL.ColName "col4")))
             ),
         P.parse whereExpP "where type = \"savings\" and balance < 100"
           ~?= Right
             ( SQL.Op2
-                (SQL.Op2 (SQL.CompVal (ColName "type")) (Comp Eq) (SQL.CompVal (LitString "savings")))
-                (Logic And)
-                (SQL.Op2 (SQL.CompVal (ColName "balance")) (Comp Lt) (SQL.CompVal (LitInt 100)))
+                (SQL.Op2 (SQL.CompVal (SQL.ColName "type")) (SQL.Comp SQL.Eq) (SQL.CompVal (SQL.LitString "savings")))
+                (SQL.Logic SQL.And)
+                (SQL.Op2 (SQL.CompVal (SQL.ColName "balance")) (SQL.Comp SQL.Lt) (SQL.CompVal (SQL.LitInt 100)))
             ),
         P.parse whereExpP "where C.balance > 1000 and D.amount > 100"
           ~?= Right
             ( SQL.Op2
                 ( SQL.Op2
-                    (SQL.CompVal (ColName "C.balance"))
-                    (Comp Gt)
-                    (SQL.CompVal (LitInt 1000))
+                    (SQL.CompVal (SQL.ColName "C.balance"))
+                    (SQL.Comp SQL.Gt)
+                    (SQL.CompVal (SQL.LitInt 1000))
                 )
-                (Logic And)
+                (SQL.Logic SQL.And)
                 ( SQL.Op2
-                    (SQL.CompVal (ColName "D.amount"))
-                    (Comp Gt)
-                    (SQL.CompVal (LitInt 100))
+                    (SQL.CompVal (SQL.ColName "D.amount"))
+                    (SQL.Comp SQL.Gt)
+                    (SQL.CompVal (SQL.LitInt 100))
                 )
             ),
         -- Check that arithmetic operations are
@@ -297,24 +297,24 @@ test_whereExpP =
           ~?= Right
             ( SQL.Op2
                 ( SQL.Op2
-                    (SQL.CompVal (LitInt 10))
-                    (Arith Times)
-                    (SQL.CompVal (LitInt 2))
+                    (SQL.CompVal (SQL.LitInt 10))
+                    (SQL.Arith Times)
+                    (SQL.CompVal (SQL.LitInt 2))
                 )
-                (Arith Plus)
-                (SQL.CompVal (LitInt 1))
+                (SQL.Arith Plus)
+                (SQL.CompVal (SQL.LitInt 1))
             ),
         -- Check that parens in arithmetic operations
         -- are parsed correctly
         P.parse whereExpP "where 10 * (2 + 1)"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (LitInt 10))
-                (Arith Times)
+                (SQL.CompVal (SQL.LitInt 10))
+                (SQL.Arith Times)
                 ( SQL.Op2
-                    (SQL.CompVal (LitInt 2))
-                    (Arith Plus)
-                    (SQL.CompVal (LitInt 1))
+                    (SQL.CompVal (SQL.LitInt 2))
+                    (SQL.Arith Plus)
+                    (SQL.CompVal (SQL.LitInt 1))
                 )
             ),
         -- Should be parsed as "(1 + (10 * 2)) + 100"
@@ -322,31 +322,31 @@ test_whereExpP =
           ~?= Right
             ( SQL.Op2
                 ( SQL.Op2
-                    (SQL.CompVal (LitInt 1))
-                    (Arith Plus)
+                    (SQL.CompVal (SQL.LitInt 1))
+                    (SQL.Arith Plus)
                     ( SQL.Op2
-                        (SQL.CompVal (LitInt 10))
-                        (Arith Times)
-                        (SQL.CompVal (LitInt 2))
+                        (SQL.CompVal (SQL.LitInt 10))
+                        (SQL.Arith Times)
+                        (SQL.CompVal (SQL.LitInt 2))
                     )
                 )
-                (Arith Plus)
-                (SQL.CompVal (LitInt 100))
+                (SQL.Arith Plus)
+                (SQL.CompVal (SQL.LitInt 100))
             ),
         -- Should be parsed as "1 + ((10 * 2) + 100)"
         P.parse whereExpP "where 1 + (10 * 2 + 100)"
           ~?= Right
             ( SQL.Op2
-                (SQL.CompVal (LitInt 1))
-                (Arith Plus)
+                (SQL.CompVal (SQL.LitInt 1))
+                (SQL.Arith Plus)
                 ( SQL.Op2
                     ( SQL.Op2
-                        (SQL.CompVal (LitInt 10))
-                        (Arith Times)
-                        (SQL.CompVal (LitInt 2))
+                        (SQL.CompVal (SQL.LitInt 10))
+                        (SQL.Arith Times)
+                        (SQL.CompVal (SQL.LitInt 2))
                     )
-                    (Arith Plus)
-                    (SQL.CompVal (LitInt 100))
+                    (SQL.Arith Plus)
+                    (SQL.CompVal (SQL.LitInt 100))
                 )
             )
       ]
@@ -447,7 +447,7 @@ test_parseQuery =
             Query
               { select = Cols [Col "col", Col "col2"],
                 from = Table "table",
-                wher = Just $ SQL.Op2 (SQL.CompVal $ ColName "col") (Comp Gt) (SQL.CompVal $ LitInt 4),
+                wher = Just $ SQL.Op2 (SQL.CompVal $ SQL.ColName "col") (SQL.Comp SQL.Gt) (SQL.CompVal $ SQL.LitInt 4),
                 groupBy = Nothing,
                 orderBy = Nothing,
                 limit = Nothing
@@ -467,7 +467,7 @@ test_parseQuery =
             ( Query
                 { select = Cols [Col "col1"],
                   from = Table "table",
-                  wher = Just (SQL.Op2 (SQL.CompVal (ColName "col1")) (Comp Gt) (SQL.CompVal (SQL.LitInt 0))),
+                  wher = Just (SQL.Op2 (SQL.CompVal (SQL.ColName "col1")) (SQL.Comp SQL.Gt) (SQL.CompVal (SQL.LitInt 0))),
                   groupBy = Just ["col1"],
                   orderBy = Just ("col1", Asc),
                   limit = Just 5
