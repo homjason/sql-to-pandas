@@ -120,11 +120,37 @@ translateJoinExp je@(Join leftTable leftCol rightTable rightCol style) =
         how = style
       }
 
+sqlToPandasUop :: SQL.Uop -> Pandas.Uop
+sqlToPandasUop uop = case uop of
+  SQL.IsNull -> Pandas.IsNull
+  SQL.IsNotNull -> Pandas.IsNotNull
+
+sqlToPandasBop :: SQL.Bop -> Pandas.Bop
+sqlToPandasBop bop = case bop of
+  SQL.Comp co -> case co of
+    SQL.Eq -> Pandas.Comp Pandas.Eq
+    SQL.Neq -> Pandas.Comp Pandas.Neq
+    SQL.Gt -> Pandas.Comp Pandas.Gt
+    SQL.Ge -> Pandas.Comp Pandas.Ge
+    SQL.Lt -> Pandas.Comp Pandas.Lt
+    SQL.Le -> Pandas.Comp Pandas.Le
+  SQL.Arith ao -> Pandas.Arith ao
+  SQL.Logic lo -> case lo of
+    SQL.And -> Pandas.Logic Pandas.And
+    SQL.Or -> Pandas.Logic Pandas.Or
+
+sqlToPandasCompVal :: SQL.Comparable -> Pandas.Comparable
+sqlToPandasCompVal comp = case comp of
+  SQL.ColName s -> Pandas.ColName s
+  SQL.LitInt n -> Pandas.LitInt n
+  SQL.LitString s -> Pandas.LitString s
+  SQL.LitDouble x -> Pandas.LitDouble x
+
 whereExpToBoolExp :: WhereExp -> BoolExp
 whereExpToBoolExp we = case we of
-  SQL.Op1 we' uop -> Pandas.Op1 (whereExpToBoolExp we') uop
-  SQL.Op2 we1 bop we2 -> Pandas.Op2 (whereExpToBoolExp we1) bop (whereExpToBoolExp we2)
-  SQL.CompVal com -> Pandas.CompVal com
+  SQL.Op1 we' uop -> Pandas.Op1 (whereExpToBoolExp we') (sqlToPandasUop uop)
+  SQL.Op2 we1 bop we2 -> Pandas.Op2 (whereExpToBoolExp we1) (sqlToPandasBop bop) (whereExpToBoolExp we2)
+  SQL.CompVal com -> Pandas.CompVal (sqlToPandasCompVal com)
 
 -- | Converts "WHERE" expressions in SQL to "loc" function in Pandas
 whereExpToLoc :: Maybe WhereExp -> [Func]
@@ -153,4 +179,4 @@ getAggs cExps = [x | x@(Agg f cols) <- cExps]
 groupByToPandasGroupBy :: Maybe [ColName] -> [Func]
 groupByToPandasGroupBy cols = case cols of
   Nothing -> []
-  Just cs -> [Pandas.GroupBy cs, ResetIndex]
+  Just cs -> [Group cs, ResetIndex]

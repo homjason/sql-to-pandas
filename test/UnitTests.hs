@@ -467,7 +467,7 @@ test_parseQuery =
             ( Query
                 { select = Cols [Col "col1"],
                   from = Table "table",
-                  wher = Just (SQL.Op2 (SQL.CompVal (ColName "col1")) (Comp Gt) (SQL.CompVal (LitInt 0))),
+                  wher = Just (SQL.Op2 (SQL.CompVal (ColName "col1")) (Comp Gt) (SQL.CompVal (SQL.LitInt 0))),
                   groupBy = Just ["col1"],
                   orderBy = Just ("col1", Asc),
                   limit = Just 5
@@ -1027,7 +1027,6 @@ test_noDistinctAndGroupBy =
 --           )
 --           ~?= Nothing
 --       ]
-
 
 --------------------------------------------------------------------------------
 -- PRINT unit tests

@@ -257,10 +257,10 @@ joinExpP = P.mkParser $ \str -> do
 whereExpP :: Parser WhereExp
 whereExpP = stringP "where" *> logicP
   where
-    logicP = compP `P.chainl1` opAtLevel (level (Logic And))
-    compP = sumP `P.chainl1` opAtLevel (level (Comp Gt))
-    sumP = prodP `P.chainl1` opAtLevel (level (Arith Plus))
-    prodP = uopexpP `P.chainl1` opAtLevel (level (Arith Times))
+    logicP = compP `P.chainl1` opAtLevel (level (SQL.Logic SQL.And))
+    compP = sumP `P.chainl1` opAtLevel (level (SQL.Comp SQL.Gt))
+    sumP = prodP `P.chainl1` opAtLevel (level (SQL.Arith Plus))
+    prodP = uopexpP `P.chainl1` opAtLevel (level (SQL.Arith Times))
     uopexpP =
       (SQL.Op1 <$> baseP <*> uopP)
         <|> baseP
@@ -276,44 +276,44 @@ opAtLevel :: Int -> Parser (WhereExp -> WhereExp -> WhereExp)
 opAtLevel l = flip SQL.Op2 <$> P.filter (\x -> level x == l) bopP
 
 -- | Parses (infix) binary operators
-bopP :: Parser Bop
+bopP :: Parser SQL.Bop
 bopP =
   P.between whitespace bop whitespace
   where
     whitespace = many P.space
     bop =
       P.choice
-        [ constP "=" (Comp Eq),
-          constP "!=" (Comp Neq),
-          constP ">=" (Comp Ge),
-          constP ">" (Comp Gt),
-          constP "<=" (Comp Le),
-          constP "<" (Comp Lt),
-          constP "+" (Arith Plus),
-          constP "-" (Arith Minus),
-          constP "*" (Arith Times),
-          constP "/" (Arith Divide),
-          constP "%" (Arith Modulo),
-          constP "and" (Logic And),
-          constP "or" (Logic Or)
+        [ constP "=" (SQL.Comp SQL.Eq),
+          constP "!=" (SQL.Comp SQL.Neq),
+          constP ">=" (SQL.Comp SQL.Ge),
+          constP ">" (SQL.Comp SQL.Gt),
+          constP "<=" (SQL.Comp SQL.Le),
+          constP "<" (SQL.Comp SQL.Lt),
+          constP "+" (SQL.Arith Plus),
+          constP "-" (SQL.Arith Minus),
+          constP "*" (SQL.Arith Times),
+          constP "/" (SQL.Arith Divide),
+          constP "%" (SQL.Arith Modulo),
+          constP "and" (SQL.Logic SQL.And),
+          constP "or" (SQL.Logic SQL.Or)
         ]
 
 -- | Parses (postfix) unary operators
-uopP :: Parser Uop
+uopP :: Parser SQL.Uop
 uopP =
   P.choice
-    [ constP "is null" IsNull,
-      constP "is not null" IsNotNull
+    [ constP "is null" SQL.IsNull,
+      constP "is not null" SQL.IsNotNull
     ]
 
 -- | Parser for Comparable values
 -- TODO: handle LitDouble
-comparableP :: Parser Comparable
+comparableP :: Parser SQL.Comparable
 comparableP =
   P.choice
-    [ ColName <$> nameP,
-      LitInt <$> wsP P.int,
-      LitString <$> litStringP
+    [ SQL.ColName <$> nameP,
+      SQL.LitInt <$> wsP P.int,
+      SQL.LitString <$> litStringP
     ]
   where
     -- Parses string literals
@@ -358,6 +358,9 @@ queryP =
 -- | Wrapper function for parsing a string as a SQL query
 parseQuery :: String -> Either P.ParseError Query
 parseQuery str = P.parse queryP (map toLower str)
+
+-- TODO: need to check that WHERE expressions are well-typed
+-- (need to have at least Op1 or Op2 in WHERE expressions)
 
 -- | Checks if a Query contains valid SQL syntax / is semantically correct
 -- (this function will be used in QuickCheck properties as a precondition)

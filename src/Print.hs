@@ -66,16 +66,65 @@ mapJoinStyleToPandasSyntax js = case js of
 -- pp (Pandas.Head n) = PP.text (".head(" ++ show n ++ ")")
 -- pp Pandas.ResetIndex = PP.text ".reset_index()"
 
-printFn :: Pandas.Func -> String
-printFn (Pandas.SortValues cName o) = ".sort_values(by=[" ++ show cName ++ "], ascending=" ++ show (convertOrdToBool o) ++ ")"
-printFn (Pandas.Rename colNameMap) = undefined
-printFn (Pandas.GroupBy colNames) = ".groupBy(by=" ++ show colNames ++ ")"
-printFn (Pandas.Aggregate fn col) = ".agg({" ++ show col ++ ":" ++ show (lowerAggName (show fn)) ++ "})"
-printFn (Pandas.Loc boolExp) = undefined
-printFn (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = ".merge(" ++ rightDf ++ ", left_on=" ++ show leftOn ++ ", right_on=" ++ show rightOn ++ ", how=" ++ show (mapJoinStyleToPandasSyntax how) ++ ")"
-printFn (Pandas.Unique colNames) = ".drop_duplicates(subset=" ++ show colNames ++ ")"
-printFn (Pandas.Head n) = ".head(" ++ show n ++ ")"
-printFn Pandas.ResetIndex = ".reset_index()"
+-- printFn :: Pandas.Func -> String
+-- printFn (Pandas.SortValues cName o) = ".sort_values(by=[" ++ show cName ++ "], ascending=" ++ show (convertOrdToBool o) ++ ")"
+-- printFn (Pandas.Rename colNameMap) = undefined
+-- printFn (Pandas.GroupBy colNames) = ".groupBy(by=" ++ show colNames ++ ")"
+-- printFn (Pandas.Aggregate fn col) = ".agg({" ++ show col ++ ":" ++ show (lowerAggName (show fn)) ++ "})"
+-- printFn (Pandas.Loc boolExp) = undefined
+-- printFn (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = ".merge(" ++ rightDf ++ ", left_on=" ++ show leftOn ++ ", right_on=" ++ show rightOn ++ ", how=" ++ show (mapJoinStyleToPandasSyntax how) ++ ")"
+-- printFn (Pandas.Unique colNames) = ".drop_duplicates(subset=" ++ show colNames ++ ")"
+-- printFn (Pandas.Head n) = ".head(" ++ show n ++ ")"
+-- printFn Pandas.ResetIndex = ".reset_index()"
+
+instance PP Pandas.Func where
+  pp (Pandas.SortValues cName o) = PP.text $ ".sort_values(by=[" ++ show cName ++ "], ascending=" ++ show (convertOrdToBool o) ++ ")"
+  pp (Pandas.Rename colNameMap) = undefined
+  pp (Pandas.Group colNames) = PP.text $ ".groupBy(by=" ++ show colNames ++ ")"
+  pp (Pandas.Aggregate fn col) = PP.text $ ".agg({" ++ show col ++ ":" ++ show (lowerAggName (show fn)) ++ "})"
+  pp (Pandas.Loc boolExp) = PP.text ".loc[" <> pp boolExp <> PP.text "]"
+  pp (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = PP.text $ ".merge(" ++ rightDf ++ ", left_on=" ++ show leftOn ++ ", right_on=" ++ show rightOn ++ ", how=" ++ show (mapJoinStyleToPandasSyntax how) ++ ")"
+  pp (Pandas.Unique colNames) = PP.text $ ".drop_duplicates(subset=" ++ show colNames ++ ")"
+  pp (Pandas.Head n) = PP.text $ ".head(" ++ show n ++ ")"
+  pp Pandas.ResetIndex = PP.text ".reset_index()"
+
+instance PP Pandas.BoolExp where
+  pp (Pandas.Op1 be uop) = pp be <> pp uop
+  pp (Pandas.Op2 be1 bop be2) = pp be1 <> PP.char ' ' <> pp bop <> PP.char ' ' <> pp be2
+  pp (Pandas.CompVal c) = pp c
+
+instance PP Pandas.Comparable where
+  pp (Pandas.ColName cn) = PP.text $ "df[" <> show cn <> "]"
+  pp (Pandas.LitInt i) = PP.int i
+  pp (Pandas.LitString s) = PP.text $ show s
+  pp (Pandas.LitDouble d) = PP.double d
+
+instance PP Pandas.Uop where
+  pp Pandas.IsNull = PP.text ".isnull()"
+  pp Pandas.IsNotNull = PP.text ".notna()"
+
+instance PP Pandas.Bop where
+  pp (Pandas.Comp op) = pp op
+  pp (Pandas.Arith op) = pp op
+  pp (Pandas.Logic op) = pp op
+
+instance PP Pandas.CompOp where
+  pp Pandas.Eq = PP.text "=="
+  pp Pandas.Neq = PP.text "!="
+  pp Pandas.Gt = PP.char '>'
+  pp Pandas.Ge = PP.text ">="
+  pp Pandas.Lt = PP.char '<'
+  pp Pandas.Le = PP.text "<="
+
+instance PP Pandas.LogicOp where
+  pp Pandas.And = PP.char '&'
+  pp Pandas.Or = PP.char '|'
+
+-- instance PP Pandas.Comparable where
+--   pp (ColName cn) = PP.text cn
+--   pp (LitInt i) = PP.int i
+--   pp (LitString s) = PP.text $ show s
+--   pp (LitDouble d) = PP.double d
 
 instance PP Pandas.MergeExp where
   pp (Pandas.MkMerge rightDf leftOn rightOn how) = PP.text (".merge(" ++ show rightDf ++ ", left_on=\"" ++ show leftOn ++ "\", right_on=\"" ++ show rightOn ++ "\", how=\"" ++ show how ++ "\")")
@@ -89,9 +138,9 @@ instance PP Pandas.Block where
 instance PP Pandas.Command where
   pp (Pandas.Command df cols fns) = case (cols, fns) of
     (Nothing, Nothing) -> PP.text df
-    (Just cs, Nothing) -> PP.text (df ++ show cs)
-    (Nothing, Just fs) -> PP.text (foldr (\f acc -> printFn f ++ acc) "" fs)
-    (Just cs, Just fs) -> PP.text (df ++ show cs ++ foldr (\f acc -> printFn f ++ acc) "" fs)
+    (Just cs, Nothing) -> PP.text (df <> show cs)
+    (Nothing, Just fs) -> PP.text df <> foldr (\f acc -> pp f <> acc) PP.empty fs
+    (Just cs, Just fs) -> PP.text (df <> show cs) <> foldr (\f acc -> pp f <> acc) PP.empty fs
 
 -- >>> pp (Command "table" (Just ["col"]) Nothing)
 -- table["col"]
@@ -174,33 +223,39 @@ instance PP WhereExp where
   pp (Op1 we uop) = pp we <> PP.char ' ' <> pp uop
   pp (CompVal c) = pp c
 
-instance PP Comparable where
+instance PP SQL.Comparable where
   pp (ColName cn) = PP.text cn
   pp (LitInt i) = PP.int i
   pp (LitString s) = PP.text $ show s
   pp (LitDouble d) = PP.double d
 
-instance PP Uop where
+instance PP SQL.Uop where
   pp IsNull = PP.text "IS NULL"
   pp IsNotNull = PP.text "IS NOT NULL"
 
-instance PP Bop where
-  pp (Comp op) = case op of
-    Eq -> PP.char '='
-    Neq -> PP.text "NOT"
-    Gt -> PP.char '>'
-    Ge -> PP.text ">="
-    Lt -> PP.char '<'
-    Le -> PP.text "<="
-  pp (Arith op) = case op of
-    Plus -> PP.char '+'
-    Minus -> PP.char '-'
-    Times -> PP.char '*'
-    Divide -> PP.char '/'
-    Modulo -> PP.text "%"
-  pp (Logic op) = case op of
-    And -> PP.text "AND"
-    Or -> PP.text "OR"
+instance PP SQL.Bop where
+  pp (Comp op) = pp op
+  pp (Arith op) = pp op
+  pp (Logic op) = pp op
+
+instance PP SQL.CompOp where
+  pp Eq = PP.char '='
+  pp Neq = PP.text "<>"
+  pp Gt = PP.char '>'
+  pp Ge = PP.text ">="
+  pp Lt = PP.char '<'
+  pp Le = PP.text "<="
+
+instance PP ArithOp where
+  pp Plus = PP.char '+'
+  pp Minus = PP.char '-'
+  pp Times = PP.char '*'
+  pp Divide = PP.char '/'
+  pp Modulo = PP.text "%"
+
+instance PP SQL.LogicOp where
+  pp And = PP.text "AND"
+  pp Or = PP.text "OR"
 
 -- >>> pp (Op2 (CompVal (ColName "c1")) (Comp Gt) (CompVal (LitInt 5)))
 -- c1 > 5

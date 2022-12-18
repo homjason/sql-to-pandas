@@ -144,7 +144,7 @@ instance Arbitrary Order where
 genColType :: Gen ColType
 genColType = QC.oneof [return IntC, return StringC, return DoubleC]
 
--- Generator for schemas
+-- Generator for schemas 
 genSchema :: Gen Schema
 genSchema = do
   -- Randomly generate a "pool" of column names to choose from
@@ -154,6 +154,7 @@ genSchema = do
   numCols <- QC.chooseInt (1, length colNamePool)
 
   -- Choose a prefix of the (ordered) pool of colnames of length numCols
+  -- (this guarantees that column names in the schema are distinct)
   let colNames = Vector.toList $ Vector.slice 0 numCols colNamePool
 
   -- Randomly choose a type for each column
@@ -266,14 +267,12 @@ genSchemaAndTable = genSchema >>= genTable
 
 -- | Given a (table, schema) pair, decide if a particular query is accepted by the table
 accept :: (Table, Schema) -> Query -> Bool
-accept (table, schema) (Query s f w gb ob l) =
-  let colNameToCol = getColOfTable schema table
-   in checkSelect schema s
-        && checkFrom (table, schema) f
-        && checkWhere schema w
-        && checkGroupBy schema gb
-        && checkOrderBy schema ob
-        && checkLimit table l
+accept (table, schema) (Query s f w gb ob l) = 
+  checkSelect schema s
+    && checkWhere schema w
+    && checkGroupBy schema gb
+    && checkOrderBy schema ob
+    && checkLimit table l
   where
     -- Checks if the columns in a SQL query are present in the table schema
     checkColsInQuery :: [ColName] -> Schema -> Bool
@@ -293,17 +292,6 @@ accept (table, schema) (Query s f w gb ob l) =
         colExpHandler colExps =
           let cs = [c | cExp@(Col c) <- colExps]
            in checkColsInQuery cs schema
-
-    -- If the SQL query is only selects from a single table, since tables are
-    -- arbitrarily generated, the table name is independent of whether the
-    -- query conforms to the table's schema (the types of its columns),
-    -- so return True if the fromExp only consists of a single TableName
-    checkFrom :: (Table, Schema) -> FromExp -> Bool
-    checkFrom (table, schema) fromExp =
-      case fromExp of
-        Table _ -> True
-        TableJoin joinExp ->
-          undefined "TODO: figure out how to resolve columns from two tables!!!"
 
     -- Checks that the table schema accepts the WHERE expression
     checkWhere :: Schema -> Maybe WhereExp -> Bool

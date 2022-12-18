@@ -43,7 +43,7 @@ instance Monoid Block where
 data Func
   = SortValues ColName Order
   | Rename (Map ColName ColName)
-  | GroupBy [ColName]
+  | Group [ColName]
   | Aggregate AggFunc ColName
   | Loc BoolExp -- filtering on rows (akin to WHERE in SQL)
   | Merge MergeExp
@@ -68,3 +68,44 @@ data BoolExp
   | Op2 BoolExp Bop BoolExp
   | CompVal Comparable
   deriving (Eq, Show)
+
+-- Values that can be compared in SQL queries (either columns or literal values)
+data Comparable
+  = ColName ColName -- column name
+  | LitInt Int -- literal ints (positive / negative)
+  | LitString String -- literal strings
+  | LitDouble Double -- literal doubles
+  deriving (Eq, Show)
+
+-- Postfix unary operators for checking if a column is null / not-null
+data Uop = IsNull | IsNotNull
+  deriving (Eq, Show, Bounded, Enum)
+
+-- Datatype representing different families of (infix) binary operators
+data Bop = Comp CompOp | Arith ArithOp | Logic LogicOp
+  deriving (Eq, Show)
+
+-- (Infix) binary operators used for comparisons
+data CompOp
+  = Eq -- `=`
+  | Neq -- `!=`
+  | Gt -- `>`
+  | Ge -- `>=`
+  | Lt -- `<`
+  | Le -- `<=`
+  deriving (Eq, Show, Enum, Bounded)
+
+-- Arithmetic (binary) operations
+-- data ArithOp
+--   = Plus -- `+`  :: Comparable -> Comparable -> Comparable
+--   | Minus -- `-`  :: Comparable -> Comparable -> Comparable
+--   | Times -- `*`  :: Comparable -> Comparable -> Comparable
+--   | Divide -- `/` :: Comparable -> Comparable -> Comparable   -- floor division
+--   | Modulo -- `%`  :: Comparable -> Comparable -> Comparable   -- modulo
+--   deriving (Eq, Show, Enum, Bounded)
+
+-- Logical (binary) operations
+data LogicOp
+  = And
+  | Or
+  deriving (Eq, Show, Enum, Bounded)
