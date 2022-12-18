@@ -83,8 +83,8 @@ genFromExp =
 --         ]
 --     return $ Query select from wher groupBy orderBy limit
 
--- genGroupBy :: Gen [ColName]
--- genGroupBy = QC.resize 2 (QC.listOf1 genColName)
+genGroupBy :: Schema -> Gen [ColName]
+genGroupBy schema = QC.resize 2 (QC.listOf1 (genColName schema))
 
 -- | Generator for non-empty strings of length <= 5 that
 -- only contain letters a-d
@@ -144,7 +144,7 @@ instance Arbitrary Order where
 genColType :: Gen ColType
 genColType = QC.oneof [return IntC, return StringC, return DoubleC]
 
--- Generator for schemas 
+-- Generator for schemas
 genSchema :: Gen Schema
 genSchema = do
   -- Randomly generate a "pool" of column names to choose from
@@ -267,7 +267,7 @@ genSchemaAndTable = genSchema >>= genTable
 
 -- | Given a (table, schema) pair, decide if a particular query is accepted by the table
 accept :: (Table, Schema) -> Query -> Bool
-accept (table, schema) (Query s f w gb ob l) = 
+accept (table, schema) (Query s f w gb ob l) =
   checkSelect schema s
     && checkWhere schema w
     && checkGroupBy schema gb
@@ -331,6 +331,9 @@ genTableQuery :: (Schema, Table) -> Gen Query
 genTableQuery (schema, table) = do
   select <- genSelectExp schema
   from <- genFromExp
+  wher <- genWhereExp schema
+  groupBy <- genGroupBy schema
+
   -- TODO: delete dummy return statement below
   return QC.discard
 
