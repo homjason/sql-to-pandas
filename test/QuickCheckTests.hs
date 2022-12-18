@@ -432,3 +432,7 @@ tableNames = map (: []) ['A' .. 'Z']
 -- Convenience functions for QuickCheck (independent of generators)
 quickCheckN :: QC.Testable prop => Int -> prop -> IO ()
 quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
+
+--------------------------------------------------------------------------------
+prop_roundtrip_query :: Query -> Bool
+prop_roundtrip_query q = P.parse queryP (pretty q) == Right q
