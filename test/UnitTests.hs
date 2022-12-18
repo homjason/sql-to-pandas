@@ -54,6 +54,7 @@ test_selectExpP =
           ~?= Right (Cols [SQL.Agg Count "col1"])
       ]
 
+-- TODO: fix the two failing test cases
 test_colExpP :: Test
 test_colExpP =
   "parsing individual columns in SELECT expressions"
@@ -807,255 +808,255 @@ test_noDistinctAndGroupBy =
 --------------------------------------------------------------------------------
 -- TRANSLATOR unit tests
 
--- selectStarQ :: Query
--- selectStarQ =
---   Query
---     { select = Star,
---       from = Table "df",
---       wher = Nothing,
---       groupBy = Nothing,
---       limit = Nothing,
---       orderBy = Nothing
---     }
+selectStarQ :: Query
+selectStarQ =
+  Query
+    { select = Star,
+      from = Table "df",
+      wher = Nothing,
+      groupBy = Nothing,
+      limit = Nothing,
+      orderBy = Nothing
+    }
 
--- selectStarCommand :: Command
--- selectStarCommand =
---   Command
---     { df = "df",
---       cols = Nothing,
---       fn = Nothing
---     }
+selectStarCommand :: Command
+selectStarCommand =
+  Command
+    { df = "df",
+      cols = Nothing,
+      fn = Nothing
+    }
 
--- -- Converting "SELECT" expressions into list of colnames in Pandas
--- test_selectExpToCols :: Test
--- test_selectExpToCols =
---   "translating SQL SELECT to Pandas"
---     ~: TestList
---       [ selectExpToCols Star ~?= ([] :: [ColName], Nothing),
---         selectExpToCols (Cols [Col "colA", Col "colB"]) ~?= (["colA", "colB"], Nothing),
---         selectExpToCols (DistinctCols [Col "colA", Col "colB"])
---           ~?= (["colA", "colB"], Just [Unique ["colA", "colB"]]),
---         selectExpToCols (Cols [Col "colA", Agg Count "colB"])
---           ~?= (["colA", "colB"], Just [Aggregate Count "colB"]),
---         selectExpToCols (Cols []) ~?= ([], Nothing),
---         selectExpToCols (DistinctCols []) ~?= ([], Nothing)
---       ]
+-- Converting "SELECT" expressions into list of colnames in Pandas
+test_selectExpToCols :: Test
+test_selectExpToCols =
+  "translating SQL SELECT to Pandas"
+    ~: TestList
+      [ selectExpToCols Star ~?= ([], Nothing), -- ([] :: [ColName], Nothing),
+        selectExpToCols (Cols [Col "colA", Col "colB"]) ~?= (["colA", "colB"], Nothing),
+        selectExpToCols (DistinctCols [Col "colA", Col "colB"])
+          ~?= (["colA", "colB"], Just [Unique ["colA", "colB"]]),
+        selectExpToCols (Cols [Col "colA", Agg Count "colB"])
+          ~?= (["colA", "colB"], Just [Aggregate Count "colB"]),
+        selectExpToCols (Cols []) ~?= ([], Nothing)
+      ]
 
--- test_translateJoinExp :: Test
--- test_translateJoinExp =
---   "translating SQL JOIN ON to Pandas Merge"
---     ~: TestList
---       [ translateJoinExp (Join "A" "id" "B" "id" InnerJoin)
---           ~?= Merge
---             MkMerge
---               { rightDf = "B",
---                 leftOn = "id",
---                 rightOn = "id",
---                 how = InnerJoin
---               }
---       ]
+test_translateJoinExp :: Test
+test_translateJoinExp =
+  "translating SQL JOIN ON to Pandas Merge"
+    ~: TestList
+      [ translateJoinExp (Join "A" "id" "B" "id" InnerJoin)
+          ~?= Merge
+            MkMerge
+              { rightDf = "B",
+                leftOn = "id",
+                rightOn = "id",
+                how = InnerJoin
+              }
+      ]
 
--- test_translateFromExp :: Test
--- test_translateFromExp =
---   "translating SQL FROM to Pandas"
---     ~: TestList
---       [ translateFromExp (Table "A") ~?= ("A", Nothing),
---         translateFromExp (TableJoin $ Join "A" "id" "B" "id" InnerJoin)
---           ~?= ( "A",
---                 Just $
---                   Merge $
---                     MkMerge
---                       { rightDf = "B",
---                         leftOn = "id",
---                         rightOn = "id",
---                         how = InnerJoin
---                       }
---               )
---       ]
+test_translateFromExp :: Test
+test_translateFromExp =
+  "translating SQL FROM to Pandas"
+    ~: TestList
+      [ translateFromExp (Table "A") ~?= ("A", Nothing),
+        translateFromExp (TableJoin $ Join "A" "id" "B" "id" InnerJoin)
+          ~?= ( "A",
+                Just $
+                  Merge $
+                    MkMerge
+                      { rightDf = "B",
+                        leftOn = "id",
+                        rightOn = "id",
+                        how = InnerJoin
+                      }
+              )
+      ]
 
--- test_whereExpToLoc :: Test
--- test_whereExpToLoc =
---   "translating SQL WHERE to Pandas Loc"
---     ~: TestList
---       [ whereExpToLoc (Just $ SQL.Op2 (SQL.CompVal (ColName "col")) (Comp Eq) (SQL.CompVal (LitString "hello")))
---           ~?= [Loc (SQL.Op2 (SQL.CompVal (ColName "col")) (Comp Eq) (SQL.CompVal (LitString "hello")))],
---         whereExpToLoc Nothing ~?= []
---       ]
+test_whereExpToLoc :: Test
+test_whereExpToLoc =
+  "translating SQL WHERE to Pandas Loc"
+    ~: TestList
+      [ whereExpToLoc (Just $ SQL.Op2 (SQL.CompVal (SQL.ColName "col")) (SQL.Comp SQL.Eq) (SQL.CompVal (SQL.LitString "hello")))
+          ~?= [Loc (Pandas.Op2 (Pandas.CompVal (Pandas.ColName "col")) (Pandas.Comp Pandas.Eq) (Pandas.CompVal (Pandas.LitString "hello")))],
+        whereExpToLoc Nothing ~?= []
+      ]
 
--- test_limitExpToHead :: Test
--- test_limitExpToHead =
---   "translating SQL LIMIT to Pandas Head"
---     ~: TestList
---       [ limitExpToHead (Just 5) ~?= [Head 5],
---         limitExpToHead Nothing ~?= []
---       ]
+test_limitExpToHead :: Test
+test_limitExpToHead =
+  "translating SQL LIMIT to Pandas Head"
+    ~: TestList
+      [ limitExpToHead (Just 5) ~?= [Head 5],
+        limitExpToHead Nothing ~?= []
+      ]
 
--- test_orderByToSortValues :: Test
--- test_orderByToSortValues =
---   "translating SQL ORDER BY to Pandas Sort Values"
---     ~: TestList
---       [ orderByToSortValues (Just ("col1", Asc)) ~?= [SortValues "col1" Asc],
---         orderByToSortValues Nothing ~?= []
---       ]
+test_orderByToSortValues :: Test
+test_orderByToSortValues =
+  "translating SQL ORDER BY to Pandas Sort Values"
+    ~: TestList
+      [ orderByToSortValues (Just ("col1", Asc)) ~?= [SortValues "col1" Asc],
+        orderByToSortValues Nothing ~?= []
+      ]
 
--- test_groupByToPandasGroupBy :: Test
--- test_groupByToPandasGroupBy =
---   "translating SQL GROUP BY to Pandas Group By"
---     ~: TestList
---       [ groupByToPandasGroupBy Nothing ~?= [],
---         groupByToPandasGroupBy (Just ["col1", "col2"]) ~?= [Pandas.GroupBy ["col1", "col2"]]
---       ]
+test_groupByToPandasGroupBy :: Test
+test_groupByToPandasGroupBy =
+  "translating SQL GROUP BY to Pandas Group By"
+    ~: TestList
+      [ groupByToPandasGroupBy Nothing ~?= [],
+        groupByToPandasGroupBy (Just ["col1", "col2"]) ~?= [Group ["col1", "col2"]]
+      ]
 
--- test_translateSQL :: Test
--- test_translateSQL =
---   "translate SQL query to Pandas command"
---     ~: TestList
---       [ translateSQL
---           ( Query
---               { select = Cols [Col "col"],
---                 from = Table "table",
---                 wher = Nothing,
---                 groupBy = Nothing,
---                 orderBy = Nothing,
---                 limit = Nothing
---               }
---           )
---           ~?= Command
---             { df = "table",
---               cols = Just ["col"],
---               fn = Nothing
---             },
---         translateSQL
---           ( Query
---               { select = Cols [Col "col"],
---                 from = Table "table",
---                 wher = Nothing,
---                 groupBy = Nothing,
---                 orderBy = Nothing,
---                 limit = Just 5
---               }
---           )
---           ~?= Command
---             { df = "table",
---               cols = Just ["col"],
---               fn = Just [Head 5]
---             },
---         translateSQL
---           ( Query
---               { select = Cols [Col "col1", Agg Count "col2"],
---                 from = Table "table",
---                 wher = Nothing,
---                 groupBy = Just ["col1"],
---                 orderBy = Nothing,
---                 limit = Nothing
---               }
---           )
---           ~?= Command
---             { df = "table",
---               cols = Just ["col1", "col2"],
---               fn = Just [Pandas.GroupBy ["col1"], Aggregate Count "col2", ResetIndex]
---             },
---         translateSQL
---           ( Query
---               { select = Cols [Col "col"],
---                 from = Table "table",
---                 wher = Nothing,
---                 groupBy = Nothing,
---                 orderBy = Just ("col", Asc),
---                 limit = Nothing
---               }
---           )
---           ~?= Command
---             { df = "table",
---               cols = Just ["col"],
---               fn = Just [SortValues "col" Asc]
---             },
---         translateSQL
---           ( Query
---               { select = Cols [Col "col", Col "col2"],
---                 from = Table "table",
---                 wher = Just $ SQL.Op2 (SQL.CompVal $ ColName "col") (Comp Gt) (SQL.CompVal $ LitInt 4),
---                 groupBy = Nothing,
---                 orderBy = Nothing,
---                 limit = Nothing
---               }
---           )
---           ~?= Command
---             { df = "table",
---               cols = Just ["col", "col2"],
---               fn = Just [Loc $ SQL.Op2 (SQL.CompVal $ ColName "col") (Comp Gt) (SQL.CompVal $ LitInt 4)]
---             },
---         translateSQL
---           ( Query
---               { select = Cols [Col "col1", Col "col2"],
---                 from = TableJoin (Join "table1" "col1" "table2" "col1" InnerJoin),
---                 wher = Nothing,
---                 groupBy = Nothing,
---                 orderBy = Nothing,
---                 limit = Nothing
---               }
---           )
---           ~?= Command
---             { df = "table1",
---               cols = Just ["col1", "col2"],
---               fn =
---                 Just
---                   [ Merge
---                       MkMerge
---                         { rightDf = "table2",
---                           leftOn = "col1",
---                           rightOn = "col1",
---                           how = InnerJoin
---                         }
---                   ]
---             }
---       ]
+test_translateSQL :: Test
+test_translateSQL =
+  "translate SQL query to Pandas command"
+    ~: TestList
+      [ translateSQL
+          ( Query
+              { select = Cols [Col "col"],
+                from = Table "table",
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= Command
+            { df = "table",
+              cols = Just ["col"],
+              fn = Nothing
+            },
+        translateSQL
+          ( Query
+              { select = Cols [Col "col"],
+                from = Table "table",
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Just 5
+              }
+          )
+          ~?= Command
+            { df = "table",
+              cols = Just ["col"],
+              fn = Just [Head 5]
+            },
+        translateSQL
+          ( Query
+              { select = Cols [Col "col1", Agg Count "col2"],
+                from = Table "table",
+                wher = Nothing,
+                groupBy = Just ["col1"],
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= Command
+            { df = "table",
+              cols = Just ["col1", "col2"],
+              fn = Just [Group ["col1"], Aggregate Count "col2", ResetIndex]
+            },
+        translateSQL
+          ( Query
+              { select = Cols [Col "col"],
+                from = Table "table",
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Just ("col", Asc),
+                limit = Nothing
+              }
+          )
+          ~?= Command
+            { df = "table",
+              cols = Just ["col"],
+              fn = Just [SortValues "col" Asc]
+            },
+        translateSQL
+          ( Query
+              { select = Cols [Col "col", Col "col2"],
+                from = Table "table",
+                wher = Just $ SQL.Op2 (SQL.CompVal $ SQL.ColName "col") (SQL.Comp SQL.Gt) (SQL.CompVal $ SQL.LitInt 4),
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= Command
+            { df = "table",
+              cols = Just ["col", "col2"],
+              fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col") (Pandas.Comp Pandas.Gt) (Pandas.CompVal $ Pandas.LitInt 4)]
+            },
+        translateSQL
+          ( Query
+              { select = Cols [Col "col1", Col "col2"],
+                from = TableJoin (Join "table1" "col1" "table2" "col1" InnerJoin),
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= Command
+            { df = "table1",
+              cols = Just ["col1", "col2"],
+              fn =
+                Just
+                  [ Merge
+                      MkMerge
+                        { rightDf = "table2",
+                          leftOn = "col1",
+                          rightOn = "col1",
+                          how = InnerJoin
+                        }
+                  ]
+            }
+      ]
 
--- test_getFuncs :: Test
--- test_getFuncs =
---   "translate SQL functions to Pandas functions"
---     ~: TestList
---       [ getFuncs
---           ( Query
---               { select = Cols [Col "col"],
---                 from = Table "table",
---                 wher = Nothing,
---                 groupBy = Nothing,
---                 orderBy = Nothing,
---                 limit = Nothing
---               }
---           )
---           ~?= Nothing
---       ]
+test_getFuncs :: Test
+test_getFuncs =
+  "translate SQL functions to Pandas functions"
+    ~: TestList
+      [ getFuncs
+          ( Query
+              { select = Cols [Col "col"],
+                from = Table "table",
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= Nothing
+      ]
 
---------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 -- PRINT unit tests
--- test_printPandasCommands :: Test
--- test_printPandasCommands =
---   "pretty printing Pandas commands"
---     ~: TestList
---       [ pp (Command "table" (Just ["col"]) Nothing) ~?= PP.text "table[\"col\"]",
---         pp (Command "table" (Just ["col"]) (Just [Head 5])) ~?= PP.text "table[\"col\"].head(5)",
---         pp (Pandas.Command "table" (Just ["col1", "col2"]) (Just [Pandas.GroupBy ["col1"], Pandas.Aggregate Count "col2", Pandas.ResetIndex])) ~?= PP.text "table[\"col1\",\"col2\"].groupBy(by=[\"col1\"]).agg({\"col2\":\"count\"}).reset_index()",
---         pp (Pandas.Command "table" (Just ["col"]) (Just [Pandas.SortValues "col" Asc])) ~?= PP.text "table[\"col\"].sort_values(by=[\"col\"], ascending=True)",
---         pp
---           ( Command
---               { df = "table1",
---                 cols = Just ["col1", "col2"],
---                 fn =
---                   Just
---                     [ Merge
---                         MkMerge
---                           { rightDf = "table2",
---                             leftOn = "col1",
---                             rightOn = "col1",
---                             how = InnerJoin
---                           }
---                     ]
---               }
---           )
---           ~?= PP.text "table1[\"col1\",\"col2\"].merge(table2, left_on=\"col1\", right_on=\"col1\", how=\"inner\")"
---       ]
+
+test_printPandasCommands :: Test
+test_printPandasCommands =
+  "pretty printing Pandas commands"
+    ~: TestList
+      [ pp (Command "table" (Just ["col"]) Nothing) ~?= PP.text "table[\"col\"]",
+        pp (Command "table" (Just ["col"]) (Just [Head 5])) ~?= PP.text "table[\"col\"].head(5)",
+        pp (Pandas.Command "table" (Just ["col1", "col2"]) (Just [Group ["col1"], Pandas.Aggregate Count "col2", Pandas.ResetIndex])) ~?= PP.text "table[\"col1\",\"col2\"].groupBy(by=[\"col1\"]).agg({\"col2\":\"count\"}).reset_index()",
+        pp (Pandas.Command "table" (Just ["col"]) (Just [Pandas.SortValues "col" Asc])) ~?= PP.text "table[\"col\"].sort_values(by=[\"col\"], ascending=True)",
+        pp
+          ( Command
+              { df = "table1",
+                cols = Just ["col1", "col2"],
+                fn =
+                  Just
+                    [ Merge
+                        MkMerge
+                          { rightDf = "table2",
+                            leftOn = "col1",
+                            rightOn = "col1",
+                            how = InnerJoin
+                          }
+                    ]
+              }
+          )
+          ~?= PP.text "table1[\"col1\",\"col2\"].merge(table2, left_on=\"col1\", right_on=\"col1\", how=\"inner\")"
+      ]
 
 --------------------------------------------------------------------------------
 -- TABLE unit tests
@@ -1219,3 +1220,34 @@ test_tableToList =
 --                 Just (DoubleVal 3.33)
 --               ]
 --       ]
+
+--------------------------------------------------------------------------------
+-- Overall Testing
+test_sql_parser :: IO Counts
+test_sql_parser =
+  runTestTT $
+    TestList
+      [ test_selectTokenP,
+        test_comparableP,
+        test_selectExpP,
+        test_fromExpP,
+        test_joinExpP,
+        test_colExpP,
+        test_whereExpP,
+        test_groupByP,
+        test_orderByP,
+        test_parseQuery
+      ]
+
+test_validate_query :: IO Counts
+test_validate_query =
+  runTestTT $
+    TestList
+      [ test_validateQuery,
+        test_getNonAggCols,
+        test_getAggCols,
+        test_selectExpIsNonEmpty,
+        test_groupByColsInSelectExp,
+        test_distinctHasNoAggFuncs,
+        test_noDistinctAndGroupBy
+      ]

@@ -17,8 +17,8 @@ import Data.Set qualified as Set
 import Parser (Parser)
 import Parser qualified as P
 import Print
-import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
-import Test.QuickCheck qualified as QC
+-- import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
+-- import Test.QuickCheck qualified as QC
 import Translator (decompColExps, getAggCols, getAggFuncs, getColNames, getNonAggCols, translateSQL)
 import Types.PandasTypes as Pandas
 import Types.SQLTypes as SQL
@@ -174,49 +174,6 @@ colnameP =
   P.setErrorMsg
     (P.filter (`notElem` aggFuncNames) nameP)
     "Colnames must be non-empty and not SQL reserved keywords"
-
--- Copied over colExpP unit tests to this file for the time being
--- TODO: fix the two failing test cases
-test_colExpP :: Test
-test_colExpP =
-  "parsing individual columns in SELECT expressions"
-    ~: TestList
-      [ P.parse colExpP "col" ~?= Right (Col "col"),
-        P.parse colExpP "col2       " ~?= Right (Col "col2"),
-        P.parse colExpP "max(col)" ~?= Right (Agg Max "col"),
-        P.parse colExpP "avg(col1)" ~?= Right (Agg Avg "col1"),
-        P.parse colExpP "count(col2)" ~?= Right (Agg Count "col2"),
-        -- Check that the names of aggregate functions are
-        -- reserved keywords and can't be used as colnames
-        P.parse colExpP "max"
-          ~?= Left selectErrorMsg,
-        P.parse colExpP "min"
-          ~?= Left selectErrorMsg,
-        P.parse colExpP "avg"
-          ~?= Left selectErrorMsg,
-        P.parse colExpP "sum"
-          ~?= Left selectErrorMsg,
-        P.parse colExpP "count"
-          ~?= Left selectErrorMsg,
-        P.parse colExpP "max(max)"
-          ~?= Left selectErrorMsg,
-        P.parse colExpP "count(count)"
-          ~?= Left selectErrorMsg,
-        P.parse colExpP "select col1, max(max), col3"
-          ~?= Left selectErrorMsg,
-        -- No column specified in aggregate function
-        P.parse colExpP "sum()"
-          ~?= Left selectErrorMsg,
-        P.parse colExpP "min("
-          ~?= Left selectErrorMsg,
-        -- Invalid function calls
-        P.parse colExpP "dsgds(col)" ~?= Left "no parses",
-        P.parse colExpP "col(col)" ~?= Left "no parses"
-      ]
-  where
-    selectErrorMsg =
-      "Colnames must be non-empty and not \
-      \SQL reserved keywords"
 
 -- | Parses commands indicating the style of the join
 joinTokenP :: Parser JoinStyle
