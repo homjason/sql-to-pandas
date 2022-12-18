@@ -903,7 +903,7 @@ test_groupByToPandasGroupBy =
   "translating SQL GROUP BY to Pandas Group By"
     ~: TestList
       [ groupByToPandasGroupBy Nothing ~?= [],
-        groupByToPandasGroupBy (Just ["col1", "col2"]) ~?= [Group ["col1", "col2"]]
+        groupByToPandasGroupBy (Just ["col1", "col2"]) ~?= [Group ["col1", "col2"], ResetIndex]
       ]
 
 test_translateSQL :: Test
@@ -1251,3 +1251,24 @@ test_validate_query =
         test_distinctHasNoAggFuncs,
         test_noDistinctAndGroupBy
       ]
+
+test_translator :: IO Counts
+test_translator =
+  runTestTT $
+    TestList
+      [ test_selectExpToCols,
+        test_translateJoinExp,
+        test_translateFromExp,
+        test_whereExpToLoc,
+        test_limitExpToHead,
+        test_orderByToSortValues,
+        test_groupByToPandasGroupBy,
+        test_translateSQL,
+        test_getFuncs
+      ]
+
+test_print :: IO Counts
+test_print = runTestTT $ TestList [test_printPandasCommands]
+
+test_table :: IO Counts
+test_table = runTestTT $ TestList [test_dimensions, test_tableToList]
