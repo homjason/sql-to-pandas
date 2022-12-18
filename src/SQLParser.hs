@@ -283,9 +283,6 @@ whereExpP = stringP "where" *> logicP
       SQL.CompVal <$> comparableP
         <|> parens logicP
 
--- >>> P.parse whereExpP "where 1 + true"
--- Right (CompVal (LitInt 1))
-
 -- | Parse an operator at a specified precedence level (from HW5)
 opAtLevel :: Int -> Parser (WhereExp -> WhereExp -> WhereExp)
 opAtLevel l = flip SQL.Op2 <$> P.filter (\x -> level x == l) bopP
@@ -382,10 +379,9 @@ parseQuery str = P.parse queryP (map toLower str)
 validateQuery :: Query -> Either P.ParseError Bool
 validateQuery q@(Query s f w gb ob l) = do
   v1 <- selectExpIsNonEmpty s
-  v2 <- groupByColsInSelectExp q
-  v3 <- distinctHasNoAggFuncs s
-  v4 <- noDistinctAndGroupBy s gb
-  Right (v1 && v2 && v3 && v4)
+  v2 <- distinctHasNoAggFuncs s
+  v3 <- noDistinctAndGroupBy s gb
+  Right (v1 && v2 && v3)
 
 -- Check that we don't have any SELECT / SELECT DISTINCT expressions
 -- without any column names specified
@@ -456,14 +452,14 @@ noDistinctAndGroupBy _ (Just _) = Right True
 noDistinctAndGroupBy _ Nothing = Right True
 
 -- Parses the string into a query and translates it into a Pandas Command
--- runParseAndTranslate :: String -> Either P.ParseError Command
--- runParseAndTranslate s = case parseQuery s of
---   Left str -> Left str
---   Right q ->
---     case validateQuery q of
---       Left validateError -> Left validateError
---       Right False -> Left "Invalid SQL query"
---       Right True -> Right $ translateSQL q
+runParseAndTranslate :: String -> Either P.ParseError Command
+runParseAndTranslate s = case parseQuery s of
+  Left str -> Left str
+  Right q ->
+    case validateQuery q of
+      Left validateError -> Left validateError
+      Right False -> Left "Invalid SQL query"
+      Right True -> Right $ translateSQL q
 
 -------------------------------------------------------------------------------
 -- Convenience functions for constructing Query records
