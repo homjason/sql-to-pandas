@@ -1,11 +1,4 @@
--- QUESTION: how do we import the module defined in the Types folder?
--- {-# LANGUAGE ImportQualifiedPost #-}
--- {-# LANGUAGE ScopedTypeVariables #-}
-
 module QuickCheckTests where
-
--- TOOD: look at error instance for QC
--- no need to do install importance
 
 import Control.Monad
 import Data.Array
@@ -31,7 +24,6 @@ import Types.PandasTypes qualified as Pandas
 import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
-
 
 -- Generator for SELECT expressions
 genSelectExp :: Gen SelectExp
@@ -124,9 +116,6 @@ instance Arbitrary JoinExp where
           rightCol = rightCol,
           style = style
         }
-
--- >>> QC.sample' (arbitrary :: Gen JoinExp)
--- [Join {leftTable = "Q", leftCol = "col0", rightTable = "Y", rightCol = "col0", style = RightJoin},Join {leftTable = "R", leftCol = "col1", rightTable = "B", rightCol = "col3", style = RightJoin},Join {leftTable = "D", leftCol = "col0", rightTable = "U", rightCol = "col0", style = RightJoin},Join {leftTable = "N", leftCol = "col0", rightTable = "F", rightCol = "col3", style = RightJoin},Join {leftTable = "D", leftCol = "col2", rightTable = "C", rightCol = "col0", style = LeftJoin},Join {leftTable = "P", leftCol = "col1", rightTable = "U", rightCol = "col0", style = InnerJoin},Join {leftTable = "O", leftCol = "col3", rightTable = "V", rightCol = "col0", style = RightJoin},Join {leftTable = "D", leftCol = "col3", rightTable = "Q", rightCol = "col2", style = InnerJoin},Join {leftTable = "Y", leftCol = "col0", rightTable = "K", rightCol = "col0", style = RightJoin},Join {leftTable = "I", leftCol = "col0", rightTable = "X", rightCol = "col0", style = LeftJoin},Join {leftTable = "I", leftCol = "col0", rightTable = "W", rightCol = "col1", style = LeftJoin}]
 
 -- Arbitrary SQL queries
 instance Arbitrary Query where
@@ -227,6 +216,17 @@ genSchema = do
   -- Create schema
   return $ Map.fromList (zip colNames colTypes)
 
+-- | Allocates a new table in the Store & computes a fresh name for the table
+-- (Adapted from HW5)
+allocateTable :: Table -> State Store ()
+allocateTable table = do
+  store <- S.get
+  -- Make a fresh name for the new table
+  let n = length (Map.keys store)
+  let tableName = "t_" ++ show n
+  -- Update the store
+  S.put (Map.insert tableName table store)
+
 -- Generator that produces a non-empty Table adhering to an input Schema
 -- If an empty Schema is provided, this generator returns the special
 -- QuickCheck discard value (QC.discard)
@@ -265,6 +265,7 @@ genTable schema
 
     -- TODO: figure out how to associate table name with table
     -- (add tablename to schema???)
+    -- TODO: look at allocateTable in LuStepper.hs
 
     -- Create the Table & use return to create a Generator of Tables
     return $ listArray ((0, 0), (numRows - 1, numCols - 1)) elts
@@ -394,6 +395,7 @@ genTableQuery :: Table -> Query
 genTableQuery = undefined "TODO"
 
 -- >>> :t S.runState
+-- S.runState :: State s a -> s -> (a, s)
 --------------------------------------------------------------------------------
 
 -- | Generate a small set of names for generated tests. These names are guaranteed to not include

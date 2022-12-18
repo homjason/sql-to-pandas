@@ -13,12 +13,14 @@ import Data.Vector qualified as Vector
 import Test.QuickCheck
 import Types.Types
 
--- QUESTION FOR JOE: define tables by row or by column?
--- (both are implemented below)
--- QUESTION FOR JOE: How to define table quality? (can't sort Maps)
-
--- Maps each Table's name (alias) to the actual table
+-- Maps each Table's name to the actual table
+-- (akin to the Store for LuStepper in HW5)
 type Store = Map TableName Table
+
+-- Tables are represented as Arrays, indexed by their (row, col)
+-- Each cell contains a Maybe Value (we allow for null entries)
+-- (Recommended by Joe)
+type Table = Array (Int, Int) (Maybe Value)
 
 -- Represents a singular value stored in a Table
 data Value
@@ -27,10 +29,28 @@ data Value
   | DoubleVal Double -- 64-bit
   deriving (Eq, Show, Ord)
 
--- Tables are represented as Arrays, indexed by their (row, col)
--- Each cell contains a Maybe Value (we allow for null entries)
--- (Recommended by Joe)
-type Table = Array (Int, Int) (Maybe Value)
+-- Initial table name
+initTableName :: TableName
+initTableName = "_G"
+
+-- Initial table schema
+initSchema :: Schema
+initSchema = Map.fromList [("col0", StringC), ("col1", StringC)]
+
+-- Initial table
+initTable :: Table
+initTable =
+  array
+    ((0, 0), (1, 1))
+    [ ((0, 0), Just (StringVal "(0, 0)")),
+      ((0, 1), Just (StringVal "(0, 1)")),
+      ((1, 0), Just (StringVal "(1, 0)")),
+      ((1, 1), Just (StringVal "(1, 1)"))
+    ]
+
+-- Initial store maps the initTable's name to the initial table
+initialStore :: Store
+initialStore = Map.singleton initTableName initTable
 
 -- Each schema is a map from ColName to a ColType
 -- (Schemas are internally ordered by lexicographic order of the colname
