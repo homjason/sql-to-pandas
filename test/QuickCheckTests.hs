@@ -25,31 +25,6 @@ import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
 
--- Generator for SELECT expressions
-genSelectExp :: Gen SelectExp
-genSelectExp =
-  QC.oneof
-    [ Cols <$> QC.resize 3 (QC.listOf1 genColExp),
-      DistinctCols <$> QC.resize 3 (QC.listOf1 genColExp),
-      return Star
-    ]
-  where
-    -- Generator for columns / aggregate functions in SELECT expressions
-    genColExp :: Gen ColExp
-    genColExp = QC.oneof [Col <$> genColName, genAgg]
-
-    -- Generator for Aggregate Function Expressions in SELECT
-    genAgg :: Gen ColExp
-    genAgg = do
-      fn <- arbitrary
-      Agg fn <$> genColName
-
--- Generator for an individual column name (taken from a colname pool)
-genColName :: Gen ColName
-genColName = do
-  colNames <- genColNamePool
-  QC.elements colNames
-
 -- Generator for the pool of column names ("col0", "col1", etc.)
 genColNamePool :: Gen [ColName]
 genColNamePool = do
@@ -61,84 +36,55 @@ genTableName :: Gen TableName
 genTableName = QC.elements tableNames
 
 -- Generator for FROM expressions
+-- TODO: uncomment arbitrary for JoinExps!
 genFromExp :: Gen FromExp
 genFromExp =
   QC.oneof
-    [ Table <$> genTableName,
-      TableJoin <$> arbitrary
-    ]
-
--- Generator for WHERE expressions
-genWhereExp :: Gen WhereExp
-genWhereExp = QC.sized aux
-  where
-    aux 0 = CompVal <$> genComparable
-    aux n =
-      QC.oneof
-        [ liftM2 Op1 (aux (n - 1)) arbitrary,
-          liftM3 Op2 (aux (n - 1)) genBop (aux (n - 1)),
-          CompVal <$> genComparable
-        ]
-
--- Implementation of QC.listOf (from meeting with Joe)
--- TODO: delete
-genList :: Gen a -> Gen [a]
-genList g = QC.sized aux
-  where
-    aux 0 = pure []
-    aux n = (:) <$> g <*> aux (n `div` 2)
-
--- Generator for Comparable values
-genComparable :: Gen Comparable
-genComparable =
-  QC.oneof
-    [ ColName <$> genColName,
-      LitInt <$> genSmallInt,
-      LitString <$> genSmallString,
-      LitDouble <$> genSmallDouble
+    [ Table <$> genTableName
+    -- TableJoin <$> arbitrary
     ]
 
 -- Generator for Join Expressions
 -- (We mandate that the leftTable & rightTable in a join must be different)
-instance Arbitrary JoinExp where
-  arbitrary :: Gen JoinExp
-  arbitrary = do
-    leftTable <- genTableName
-    leftCol <- genColName
-    rightTable <- genTableName `QC.suchThat` (/= leftTable)
-    rightCol <- genColName
-    style <- arbitrary
-    return $
-      Join
-        { leftTable = leftTable,
-          leftCol = leftCol,
-          rightTable = rightTable,
-          rightCol = rightCol,
-          style = style
-        }
+-- instance Arbitrary JoinExp where
+--   arbitrary :: Gen JoinExp
+--   arbitrary = do
+--     leftTable <- genTableName
+--     leftCol <- genColName
+--     rightTable <- genTableName `QC.suchThat` (/= leftTable)
+--     rightCol <- genColName
+--     style <- arbitrary
+--     return $
+--       Join
+--         { leftTable = leftTable,
+--           leftCol = leftCol,
+--           rightTable = rightTable,
+--           rightCol = rightCol,
+--           style = style
+--         }
 
 -- Arbitrary SQL queries
-instance Arbitrary Query where
-  arbitrary :: Gen Query
-  arbitrary = do
-    select <- genSelectExp
-    from <- genFromExp
-    wher <- QC.frequency [(1, return Nothing), (7, Just <$> genWhereExp)]
-    groupBy <- QC.frequency [(1, return Nothing), (7, Just <$> genGroupBy)]
-    orderBy <-
-      QC.frequency
-        [ (1, return Nothing),
-          (7, Just <$> liftM2 (,) genColName (arbitrary :: Gen Order))
-        ]
-    limit <-
-      QC.frequency
-        [ (1, return Nothing),
-          (7, Just <$> genSmallInt)
-        ]
-    return $ Query select from wher groupBy orderBy limit
+-- instance Arbitrary Query where
+--   arbitrary :: Gen Query
+--   arbitrary = do
+--     select <- genSelectExp
+--     from <- genFromExp
+--     wher <- QC.frequency [(1, return Nothing), (7, Just <$> genWhereExp)]
+--     groupBy <- QC.frequency [(1, return Nothing), (7, Just <$> genGroupBy)]
+--     orderBy <-
+--       QC.frequency
+--         [ (1, return Nothing),
+--           (7, Just <$> liftM2 (,) genColName (arbitrary :: Gen Order))
+--         ]
+--     limit <-
+--       QC.frequency
+--         [ (1, return Nothing),
+--           (7, Just <$> genSmallInt)
+--         ]
+--     return $ Query select from wher groupBy orderBy limit
 
-genGroupBy :: Gen [ColName]
-genGroupBy = QC.resize 2 (QC.listOf1 genColName)
+-- genGroupBy :: Gen [ColName]
+-- genGroupBy = QC.resize 2 (QC.listOf1 genColName)
 
 -- | Generator for non-empty strings of length <= 5 that
 -- only contain letters a-d
@@ -267,6 +213,8 @@ genTable schema
     -- (add tablename to schema???)
     -- TODO: look at allocateTable in LuStepper.hs
 
+    let table = listArray ((0, 0), (numRows - 1, numCols - 1)) elts
+
     -- Create the Table & use return to create a Generator of Tables
     return $ listArray ((0, 0), (numRows - 1, numCols - 1)) elts
 
@@ -390,9 +338,80 @@ accept (table, schema) (Query s f w gb ob l) =
       let (numRows, _) = dimensions table
        in n <= numRows
 
--- | Generator for queries that are accepted by a given table
-genTableQuery :: Table -> Query
-genTableQuery = undefined "TODO"
+-- | Generator for queries that are accepted by a given (schema, table) pair
+genTableQuery :: (Schema, Table) -> Gen Query
+genTableQuery (schema, table) = do
+  select <- genSelectExp schema
+  from <- genFromExp
+  -- TODO: delete dummy return statement below
+  return QC.discard
+
+-- | Only generate column names in a particular schema
+genColName :: Schema -> Gen ColName
+genColName schema =
+  let colNames = Map.keys schema
+   in QC.elements colNames
+
+-- Generator for SELECT expressions (NEW)
+genSelectExp :: Schema -> Gen SelectExp
+genSelectExp schema =
+  QC.oneof
+    [ Cols <$> QC.resize 3 (QC.listOf1 (genColExp schema)),
+      DistinctCols <$> QC.resize 3 (QC.listOf1 (genColExp schema)),
+      return Star
+    ]
+  where
+    -- Generator for columns / aggregate functions in SELECT expressions
+    genColExp :: Schema -> Gen ColExp
+    genColExp schema = QC.oneof [Col <$> genColName schema, genAgg schema]
+
+    -- Generator for Aggregate Function Expressions in SELECT
+    -- Looks up the type of each column in the schema to figure out
+    -- the appropriate aggregate function
+    -- Only Count, Min, Max allowed on string columns
+    -- (the latter 2 use lexicographic ordering)
+    genAgg :: Schema -> Gen ColExp
+    genAgg schema = do
+      colName <- genColName schema
+      let colType = Map.lookup colName schema
+      case colType of
+        Nothing -> return QC.discard
+        Just StringC -> do
+          fn <- QC.elements [Count, Min, Max]
+          Agg fn <$> genColName schema
+        Just _ -> do
+          fn <- arbitrary
+          Agg fn <$> genColName schema
+
+-- Generator for WHERE expressions (NEW)
+genWhereExp :: Schema -> Gen WhereExp
+genWhereExp schema = QC.sized aux
+  where
+    aux 0 = CompVal <$> genComparable schema
+    aux n =
+      QC.oneof
+        [ liftM2 Op1 (aux (n - 1)) arbitrary,
+          liftM3 Op2 (aux (n - 1)) genBop (aux (n - 1)),
+          CompVal <$> genComparable schema
+        ]
+
+    -- Generator for Comparable values
+    genComparable :: Schema -> Gen Comparable
+    genComparable schema =
+      QC.oneof
+        [ ColName <$> genColName schema,
+          LitInt <$> genSmallInt,
+          LitString <$> genSmallString,
+          LitDouble <$> genSmallDouble
+        ]
+
+-- | Generator that pipelines the process of generating a schema, then a table,
+-- then a query (making sure that all three of them cohere)
+genSchemaTableQuery :: Gen Query
+genSchemaTableQuery = do
+  schema <- genSchema
+  table <- genTable schema
+  genTableQuery (schema, table)
 
 -- >>> :t S.runState
 -- S.runState :: State s a -> s -> (a, s)

@@ -117,16 +117,6 @@ getColOfTable schema table =
         )
         colToIdx
 
------ EXAMPLES
-schema :: Schema
-schema = Map.fromList [("col0", IntC), ("col1", StringC)]
-
-table :: Table
-table = array ((0, 0), (1, 1)) [((0, 0), Just (IntVal 0)), ((0, 1), Just (StringVal "ab")), ((1, 0), Just (IntVal 4)), ((1, 1), Just (StringVal "cd"))]
-
--- >>> getColOfTable schema table
--- fromList [("col0",Column [Just (IntVal 0),Just (IntVal 4)]),("col1",Column [Just (StringVal "ab"),Just (StringVal "cd")])]
-
 --------------------------------------------------------------------------------
 -- CONVENIENCE FUNCTIONS FOR SCHEMA CONSTRUCTION
 
