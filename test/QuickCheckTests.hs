@@ -21,14 +21,17 @@ import Parser (Parser)
 import Parser qualified as P
 import Print
 import SQLParser
+import State (State)
+import State qualified as S
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
 import Test.QuickCheck qualified as Qc
 import Translator
-import Types.PandasTypes
+import Types.PandasTypes qualified as Pandas
 import Types.SQLTypes
 import Types.TableTypes
 import Types.Types
+
 
 -- Generator for SELECT expressions
 genSelectExp :: Gen SelectExp
@@ -104,7 +107,9 @@ genComparable =
     ]
 
 -- Generator for Join Expressions
+-- (We mandate that the leftTable & rightTable in a join must be different)
 instance Arbitrary JoinExp where
+  arbitrary :: Gen JoinExp
   arbitrary = do
     leftTable <- genTableName
     leftCol <- genColName
@@ -119,6 +124,9 @@ instance Arbitrary JoinExp where
           rightCol = rightCol,
           style = style
         }
+
+-- >>> QC.sample' (arbitrary :: Gen JoinExp)
+-- [Join {leftTable = "Q", leftCol = "col0", rightTable = "Y", rightCol = "col0", style = RightJoin},Join {leftTable = "R", leftCol = "col1", rightTable = "B", rightCol = "col3", style = RightJoin},Join {leftTable = "D", leftCol = "col0", rightTable = "U", rightCol = "col0", style = RightJoin},Join {leftTable = "N", leftCol = "col0", rightTable = "F", rightCol = "col3", style = RightJoin},Join {leftTable = "D", leftCol = "col2", rightTable = "C", rightCol = "col0", style = LeftJoin},Join {leftTable = "P", leftCol = "col1", rightTable = "U", rightCol = "col0", style = InnerJoin},Join {leftTable = "O", leftCol = "col3", rightTable = "V", rightCol = "col0", style = RightJoin},Join {leftTable = "D", leftCol = "col3", rightTable = "Q", rightCol = "col2", style = InnerJoin},Join {leftTable = "Y", leftCol = "col0", rightTable = "K", rightCol = "col0", style = RightJoin},Join {leftTable = "I", leftCol = "col0", rightTable = "X", rightCol = "col0", style = LeftJoin},Join {leftTable = "I", leftCol = "col0", rightTable = "W", rightCol = "col1", style = LeftJoin}]
 
 -- Arbitrary SQL queries
 instance Arbitrary Query where
@@ -305,6 +313,8 @@ genCol colLen colType =
 genSchemaAndTable :: Gen Table
 genSchemaAndTable = genSchema >>= genTable
 
+-- TODO: reread State monad lecture notes to figure out JoinExps
+
 -- | Given a (table, schema) pair, decide if a particular query is accepted by the table
 accept :: (Table, Schema) -> Query -> Bool
 accept (table, schema) (Query s f w gb ob l) =
@@ -346,6 +356,7 @@ accept (table, schema) (Query s f w gb ob l) =
         TableJoin joinExp ->
           undefined "TODO: figure out how to resolve columns from two tables!!!"
 
+    -- Checks that the table schema accepts the WHERE expression
     checkWhere :: Schema -> Maybe WhereExp -> Bool
     checkWhere schema Nothing = True
     checkWhere schema (Just whereExp) =
@@ -357,18 +368,21 @@ accept (table, schema) (Query s f w gb ob l) =
         -- Literal string/int/double values are accepted
         CompVal _ -> True
 
+    -- Checks that the table schema accepts the GROUP BY expression
     checkGroupBy :: Schema -> Maybe [ColName] -> Bool
     checkGroupBy schema gb =
       case gb of
         Just cols -> checkColsInQuery cols schema
         Nothing -> True
 
+    -- Checks that the table schema accepts the ORDER BY expression
     checkOrderBy :: Schema -> Maybe (ColName, Order) -> Bool
     checkOrderBy schema ob =
       case ob of
         Just (col, order) -> checkColsInQuery [col] schema
         Nothing -> True
 
+    -- Check that no. of rows in LIMIT expression <= no. of rows in the table
     checkLimit :: Table -> Maybe Int -> Bool
     checkLimit _table Nothing = True
     checkLimit table (Just n) =
@@ -379,6 +393,7 @@ accept (table, schema) (Query s f w gb ob l) =
 genTableQuery :: Table -> Query
 genTableQuery = undefined "TODO"
 
+-- >>> :t S.runState
 --------------------------------------------------------------------------------
 
 -- | Generate a small set of names for generated tests. These names are guaranteed to not include
@@ -396,12 +411,6 @@ genTableQuery = undefined "TODO"
 
 -- prop_table_len :: Query -> Bool
 -- prop_table_len q = length (pretty (getSQLTable q)) == length (pretty (getPandasTable (translateSQL q)))
-
-getSQLTable :: Query -> Table
-getSQLTable = undefined
-
-getPandasTable :: Block -> Table
-getPandasTable = undefined
 
 -- Check if fields corresponding to irrelevant components of a Query
 -- are set to Nothing after parsing

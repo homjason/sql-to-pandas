@@ -104,249 +104,249 @@ test_whereExpP =
           ~?= Left "Parsing results don't satisfy predicate",
         P.parse whereExpP "where 1 + 2"
           ~?= Right
-            ( Op2
-                (CompVal (LitInt 1))
+            ( SQL.Op2
+                (SQL.CompVal (LitInt 1))
                 (Arith Plus)
-                (CompVal (LitInt 2))
+                (SQL.CompVal (LitInt 2))
             ),
         P.parse whereExpP "where (1) + (2)"
           ~?= Right
-            ( Op2
-                (CompVal (LitInt 1))
+            ( SQL.Op2
+                (SQL.CompVal (LitInt 1))
                 (Arith Plus)
-                (CompVal (LitInt 2))
+                (SQL.CompVal (LitInt 2))
             ),
         P.parse whereExpP "where 1 * 2"
           ~?= Right
-            ( Op2
-                (CompVal (LitInt 1))
+            ( SQL.Op2
+                (SQL.CompVal (LitInt 1))
                 (Arith Times)
-                (CompVal (LitInt 2))
+                (SQL.CompVal (LitInt 2))
             ),
         P.parse whereExpP "where 1*2"
           ~?= Right
-            ( Op2
-                (CompVal (LitInt 1))
+            ( SQL.Op2
+                (SQL.CompVal (LitInt 1))
                 (Arith Times)
-                (CompVal (LitInt 2))
+                (SQL.CompVal (LitInt 2))
             ),
         P.parse whereExpP "where     2          *   3"
           ~?= Right
-            ( Op2
-                (CompVal (LitInt 2))
+            ( SQL.Op2
+                (SQL.CompVal (LitInt 2))
                 (Arith Times)
-                (CompVal (LitInt 3))
+                (SQL.CompVal (LitInt 3))
             ),
         P.parse whereExpP "where 4 / 2"
           ~?= Right
-            ( Op2
-                (CompVal (LitInt 4))
+            ( SQL.Op2
+                (SQL.CompVal (LitInt 4))
                 (Arith Divide)
-                (CompVal (LitInt 2))
+                (SQL.CompVal (LitInt 2))
             ),
         P.parse whereExpP "where 3 - 2"
           ~?= Right
-            ( Op2
-                (CompVal (LitInt 3))
+            ( SQL.Op2
+                (SQL.CompVal (LitInt 3))
                 (Arith Minus)
-                (CompVal (LitInt 2))
+                (SQL.CompVal (LitInt 2))
             ),
         P.parse whereExpP "where 1 < 2"
           ~?= Right
-            ( Op2
-                (CompVal (LitInt 1))
+            ( SQL.Op2
+                (SQL.CompVal (LitInt 1))
                 (Comp Lt)
-                (CompVal (LitInt 2))
+                (SQL.CompVal (LitInt 2))
             ),
         P.parse whereExpP "where col > 0"
           ~?= Right
-            ( Op2
-                (CompVal (ColName "col"))
+            ( SQL.Op2
+                (SQL.CompVal (ColName "col"))
                 (Comp Gt)
-                (CompVal (LitInt 0))
+                (SQL.CompVal (LitInt 0))
             ),
         P.parse whereExpP "where col < 1"
           ~?= Right
-            ( Op2
-                (CompVal (ColName "col"))
+            ( SQL.Op2
+                (SQL.CompVal (ColName "col"))
                 (Comp Lt)
-                (CompVal (LitInt 1))
+                (SQL.CompVal (LitInt 1))
             ),
         P.parse whereExpP "where col = \"hello\""
           ~?= Right
-            ( Op2
-                (CompVal (ColName "col"))
+            ( SQL.Op2
+                (SQL.CompVal (ColName "col"))
                 (Comp Eq)
-                (CompVal (LitString "hello"))
+                (SQL.CompVal (LitString "hello"))
             ),
         P.parse whereExpP "where col != \"invalid\""
           ~?= Right
-            ( Op2
-                (CompVal (ColName "col"))
+            ( SQL.Op2
+                (SQL.CompVal (ColName "col"))
                 (Comp Neq)
-                (CompVal (LitString "invalid"))
+                (SQL.CompVal (LitString "invalid"))
             ),
         P.parse whereExpP "where col = 5"
           ~?= Right
-            ( Op2
-                (CompVal (ColName "col"))
+            ( SQL.Op2
+                (SQL.CompVal (ColName "col"))
                 (Comp Eq)
-                (CompVal (LitInt 5))
+                (SQL.CompVal (LitInt 5))
             ),
         P.parse whereExpP "where col != 0"
           ~?= Right
-            ( Op2
-                (CompVal (ColName "col"))
+            ( SQL.Op2
+                (SQL.CompVal (ColName "col"))
                 (Comp Neq)
-                (CompVal (LitInt 0))
+                (SQL.CompVal (LitInt 0))
             ),
         P.parse whereExpP "where col1 != col2"
           ~?= Right
-            ( Op2
-                (CompVal (ColName "col1"))
+            ( SQL.Op2
+                (SQL.CompVal (ColName "col1"))
                 (Comp Neq)
-                (CompVal (ColName "col2"))
+                (SQL.CompVal (ColName "col2"))
             ),
         P.parse whereExpP "where col is null"
-          ~?= Right (Op1 (CompVal (ColName "col")) IsNull),
+          ~?= Right (SQL.Op1 (SQL.CompVal (ColName "col")) IsNull),
         P.parse whereExpP "where col is not null"
-          ~?= Right (Op1 (CompVal (ColName "col")) IsNotNull),
+          ~?= Right (SQL.Op1 (SQL.CompVal (ColName "col")) IsNotNull),
         P.parse whereExpP "where col              is null"
-          ~?= Right (Op1 (CompVal (ColName "col")) IsNull),
+          ~?= Right (SQL.Op1 (SQL.CompVal (ColName "col")) IsNull),
         P.parse whereExpP "where col > 5"
           ~?= Right
-            ( Op2
-                (CompVal (ColName "col"))
+            ( SQL.Op2
+                (SQL.CompVal (ColName "col"))
                 (Comp Gt)
-                (CompVal (LitInt 5))
+                (SQL.CompVal (LitInt 5))
             ),
         P.parse whereExpP "where col                <= 5"
           ~?= Right
-            ( Op2
-                (CompVal (ColName "col"))
+            ( SQL.Op2
+                (SQL.CompVal (ColName "col"))
                 (Comp Le)
-                (CompVal (LitInt 5))
+                (SQL.CompVal (LitInt 5))
             ),
         P.parse whereExpP "where col + 1 = 2"
           ~?= Right
-            ( Op2
-                (Op2 (CompVal (ColName "col")) (Arith Plus) (CompVal (LitInt 1)))
+            ( SQL.Op2
+                (SQL.Op2 (SQL.CompVal (ColName "col")) (Arith Plus) (SQL.CompVal (LitInt 1)))
                 (Comp Eq)
-                (CompVal (LitInt 2))
+                (SQL.CompVal (LitInt 2))
             ),
         P.parse whereExpP "where (col1 is null) and (col2 is not null)"
           ~?= Right
-            ( Op2
-                (Op1 (CompVal (ColName "col1")) IsNull)
+            ( SQL.Op2
+                (SQL.Op1 (SQL.CompVal (ColName "col1")) IsNull)
                 (Logic And)
-                (Op1 (CompVal (ColName "col2")) IsNotNull)
+                (SQL.Op1 (SQL.CompVal (ColName "col2")) IsNotNull)
             ),
         P.parse whereExpP "where (col1 is null) or (col2 >= 0)"
           ~?= Right
-            ( Op2
-                (Op1 (CompVal (ColName "col1")) IsNull)
+            ( SQL.Op2
+                (SQL.Op1 (SQL.CompVal (ColName "col1")) IsNull)
                 (Logic Or)
-                (Op2 (CompVal (ColName "col2")) (Comp Ge) (CompVal (LitInt 0)))
+                (SQL.Op2 (SQL.CompVal (ColName "col2")) (Comp Ge) (SQL.CompVal (LitInt 0)))
             ),
         P.parse whereExpP "where (col1 / col2) and (col2 != 0)"
           ~?= Right
-            ( Op2
-                (Op2 (CompVal (ColName "col1")) (Arith Divide) (CompVal (ColName "col2")))
+            ( SQL.Op2
+                (SQL.Op2 (SQL.CompVal (ColName "col1")) (Arith Divide) (SQL.CompVal (ColName "col2")))
                 (Logic And)
-                (Op2 (CompVal (ColName "col2")) (Comp Neq) (CompVal (LitInt 0)))
+                (SQL.Op2 (SQL.CompVal (ColName "col2")) (Comp Neq) (SQL.CompVal (LitInt 0)))
             ),
         P.parse whereExpP "where col1 + col2 > 3"
           ~?= Right
-            ( Op2
-                (Op2 (CompVal (ColName "col1")) (Arith Plus) (CompVal (ColName "col2")))
+            ( SQL.Op2
+                (SQL.Op2 (SQL.CompVal (ColName "col1")) (Arith Plus) (SQL.CompVal (ColName "col2")))
                 (Comp Gt)
-                (CompVal (LitInt 3))
+                (SQL.CompVal (LitInt 3))
             ),
         P.parse whereExpP "where col1 - col2 = col3 - col4"
           ~?= Right
-            ( Op2
-                (Op2 (CompVal (ColName "col1")) (Arith Minus) (CompVal (ColName "col2")))
+            ( SQL.Op2
+                (SQL.Op2 (SQL.CompVal (ColName "col1")) (Arith Minus) (SQL.CompVal (ColName "col2")))
                 (Comp Eq)
-                (Op2 (CompVal (ColName "col3")) (Arith Minus) (CompVal (ColName "col4")))
+                (SQL.Op2 (SQL.CompVal (ColName "col3")) (Arith Minus) (SQL.CompVal (ColName "col4")))
             ),
         P.parse whereExpP "where type = \"savings\" and balance < 100"
           ~?= Right
-            ( Op2
-                (Op2 (CompVal (ColName "type")) (Comp Eq) (CompVal (LitString "savings")))
+            ( SQL.Op2
+                (SQL.Op2 (SQL.CompVal (ColName "type")) (Comp Eq) (SQL.CompVal (LitString "savings")))
                 (Logic And)
-                (Op2 (CompVal (ColName "balance")) (Comp Lt) (CompVal (LitInt 100)))
+                (SQL.Op2 (SQL.CompVal (ColName "balance")) (Comp Lt) (SQL.CompVal (LitInt 100)))
             ),
         P.parse whereExpP "where C.balance > 1000 and D.amount > 100"
           ~?= Right
-            ( Op2
-                ( Op2
-                    (CompVal (ColName "C.balance"))
+            ( SQL.Op2
+                ( SQL.Op2
+                    (SQL.CompVal (ColName "C.balance"))
                     (Comp Gt)
-                    (CompVal (LitInt 1000))
+                    (SQL.CompVal (LitInt 1000))
                 )
                 (Logic And)
-                ( Op2
-                    (CompVal (ColName "D.amount"))
+                ( SQL.Op2
+                    (SQL.CompVal (ColName "D.amount"))
                     (Comp Gt)
-                    (CompVal (LitInt 100))
+                    (SQL.CompVal (LitInt 100))
                 )
             ),
         -- Check that arithmetic operations are
         -- parsed in a left associative manner
         P.parse whereExpP "where 10 * 2 + 1"
           ~?= Right
-            ( Op2
-                ( Op2
-                    (CompVal (LitInt 10))
+            ( SQL.Op2
+                ( SQL.Op2
+                    (SQL.CompVal (LitInt 10))
                     (Arith Times)
-                    (CompVal (LitInt 2))
+                    (SQL.CompVal (LitInt 2))
                 )
                 (Arith Plus)
-                (CompVal (LitInt 1))
+                (SQL.CompVal (LitInt 1))
             ),
         -- Check that parens in arithmetic operations
         -- are parsed correctly
         P.parse whereExpP "where 10 * (2 + 1)"
           ~?= Right
-            ( Op2
-                (CompVal (LitInt 10))
+            ( SQL.Op2
+                (SQL.CompVal (LitInt 10))
                 (Arith Times)
-                ( Op2
-                    (CompVal (LitInt 2))
+                ( SQL.Op2
+                    (SQL.CompVal (LitInt 2))
                     (Arith Plus)
-                    (CompVal (LitInt 1))
+                    (SQL.CompVal (LitInt 1))
                 )
             ),
         -- Should be parsed as "(1 + (10 * 2)) + 100"
         P.parse whereExpP "where 1 + 10 * 2 + 100"
           ~?= Right
-            ( Op2
-                ( Op2
-                    (CompVal (LitInt 1))
+            ( SQL.Op2
+                ( SQL.Op2
+                    (SQL.CompVal (LitInt 1))
                     (Arith Plus)
-                    ( Op2
-                        (CompVal (LitInt 10))
+                    ( SQL.Op2
+                        (SQL.CompVal (LitInt 10))
                         (Arith Times)
-                        (CompVal (LitInt 2))
+                        (SQL.CompVal (LitInt 2))
                     )
                 )
                 (Arith Plus)
-                (CompVal (LitInt 100))
+                (SQL.CompVal (LitInt 100))
             ),
         -- Should be parsed as "1 + ((10 * 2) + 100)"
         P.parse whereExpP "where 1 + (10 * 2 + 100)"
           ~?= Right
-            ( Op2
-                (CompVal (LitInt 1))
+            ( SQL.Op2
+                (SQL.CompVal (LitInt 1))
                 (Arith Plus)
-                ( Op2
-                    ( Op2
-                        (CompVal (LitInt 10))
+                ( SQL.Op2
+                    ( SQL.Op2
+                        (SQL.CompVal (LitInt 10))
                         (Arith Times)
-                        (CompVal (LitInt 2))
+                        (SQL.CompVal (LitInt 2))
                     )
                     (Arith Plus)
-                    (CompVal (LitInt 100))
+                    (SQL.CompVal (LitInt 100))
                 )
             )
       ]
@@ -447,7 +447,7 @@ test_parseQuery =
             Query
               { select = Cols [Col "col", Col "col2"],
                 from = Table "table",
-                wher = Just $ Op2 (CompVal $ ColName "col") (Comp Gt) (CompVal $ LitInt 4),
+                wher = Just $ SQL.Op2 (SQL.CompVal $ ColName "col") (Comp Gt) (SQL.CompVal $ LitInt 4),
                 groupBy = Nothing,
                 orderBy = Nothing,
                 limit = Nothing
@@ -467,7 +467,7 @@ test_parseQuery =
             ( Query
                 { select = Cols [Col "col1"],
                   from = Table "table",
-                  wher = Just (Op2 (CompVal (ColName "col1")) (Comp Gt) (CompVal (LitInt 0))),
+                  wher = Just (SQL.Op2 (SQL.CompVal (ColName "col1")) (Comp Gt) (SQL.CompVal (LitInt 0))),
                   groupBy = Just ["col1"],
                   orderBy = Just ("col1", Asc),
                   limit = Just 5
@@ -807,269 +807,256 @@ test_noDistinctAndGroupBy =
 --------------------------------------------------------------------------------
 -- TRANSLATOR unit tests
 
-selectStarQ :: Query
-selectStarQ =
-  Query
-    { select = Star,
-      from = Table "df",
-      wher = Nothing,
-      groupBy = Nothing,
-      limit = Nothing,
-      orderBy = Nothing
-    }
+-- selectStarQ :: Query
+-- selectStarQ =
+--   Query
+--     { select = Star,
+--       from = Table "df",
+--       wher = Nothing,
+--       groupBy = Nothing,
+--       limit = Nothing,
+--       orderBy = Nothing
+--     }
 
-selectStarCommand :: Command
-selectStarCommand =
-  Command
-    { df = "df",
-      cols = Nothing,
-      fn = Nothing
-    }
+-- selectStarCommand :: Command
+-- selectStarCommand =
+--   Command
+--     { df = "df",
+--       cols = Nothing,
+--       fn = Nothing
+--     }
 
--- Converting "SELECT" expressions into list of colnames in Pandas
-test_selectExpToCols :: Test
-test_selectExpToCols =
-  "translating SQL SELECT to Pandas"
-    ~: TestList
-      [ selectExpToCols Star ~?= ([] :: [ColName], Nothing),
-        selectExpToCols (Cols [Col "colA", Col "colB"]) ~?= (["colA", "colB"], Nothing),
-        selectExpToCols (DistinctCols [Col "colA", Col "colB"])
-          ~?= (["colA", "colB"], Just [Unique ["colA", "colB"]]),
-        selectExpToCols (Cols [Col "colA", Agg Count "colB"])
-          ~?= (["colA", "colB"], Just [Aggregate Count "colB"]),
-        selectExpToCols (Cols []) ~?= ([], Nothing),
-        selectExpToCols (DistinctCols []) ~?= ([], Nothing)
-      ]
-
-test_translateJoinExp :: Test
-test_translateJoinExp =
-  "translating SQL JOIN ON to Pandas Merge"
-    ~: TestList
-      [ translateJoinExp (Join "A" "id" "B" "id" InnerJoin)
-          ~?= Merge
-            MkMerge
-              { rightDf = "B",
-                leftOn = "id",
-                rightOn = "id",
-                how = InnerJoin
-              }
-      ]
-
-test_translateFromExp :: Test
-test_translateFromExp =
-  "translating SQL FROM to Pandas"
-    ~: TestList
-      [ translateFromExp (Table "A") ~?= ("A", Nothing),
-        translateFromExp (TableJoin $ Join "A" "id" "B" "id" InnerJoin)
-          ~?= ( "A",
-                Just $
-                  Merge $
-                    MkMerge
-                      { rightDf = "B",
-                        leftOn = "id",
-                        rightOn = "id",
-                        how = InnerJoin
-                      }
-              )
-      ]
-
-test_whereExpToLoc :: Test
-test_whereExpToLoc =
-  "translating SQL WHERE to Pandas Loc"
-    ~: TestList
-      [ whereExpToLoc (Just $ Op2 (CompVal (ColName "col")) (Comp Eq) (CompVal (LitString "hello")))
-          ~?= [Loc (Op2 (CompVal (ColName "col")) (Comp Eq) (CompVal (LitString "hello")))],
-        whereExpToLoc Nothing ~?= []
-      ]
-
-test_limitExpToHead :: Test
-test_limitExpToHead =
-  "translating SQL LIMIT to Pandas Head"
-    ~: TestList
-      [ limitExpToHead (Just 5) ~?= [Head 5],
-        limitExpToHead Nothing ~?= []
-      ]
-
-test_orderByToSortValues :: Test
-test_orderByToSortValues =
-  "translating SQL ORDER BY to Pandas Sort Values"
-    ~: TestList
-      [ orderByToSortValues (Just ("col1", Asc)) ~?= [SortValues "col1" Asc],
-        orderByToSortValues Nothing ~?= []
-      ]
-
-test_groupByToPandasGroupBy :: Test
-test_groupByToPandasGroupBy =
-  "translating SQL GROUP BY to Pandas Group By"
-    ~: TestList
-      [ groupByToPandasGroupBy Nothing ~?= [],
-        groupByToPandasGroupBy (Just ["col1", "col2"]) ~?= [Pandas.GroupBy ["col1", "col2"]]
-      ]
-
-test_translateSQL :: Test
-test_translateSQL =
-  "translate SQL query to Pandas command"
-    ~: TestList
-      [ translateSQL
-          ( Query
-              { select = Cols [Col "col"],
-                from = Table "table",
-                wher = Nothing,
-                groupBy = Nothing,
-                orderBy = Nothing,
-                limit = Nothing
-              }
-          )
-          ~?= Command
-            { df = "table",
-              cols = Just ["col"],
-              fn = Nothing
-            },
-        translateSQL
-          ( Query
-              { select = Cols [Col "col"],
-                from = Table "table",
-                wher = Nothing,
-                groupBy = Nothing,
-                orderBy = Nothing,
-                limit = Just 5
-              }
-          )
-          ~?= Command
-            { df = "table",
-              cols = Just ["col"],
-              fn = Just [Head 5]
-            },
-        translateSQL
-          ( Query
-              { select = Cols [Col "col1", Agg Count "col2"],
-                from = Table "table",
-                wher = Nothing,
-                groupBy = Just ["col1"],
-                orderBy = Nothing,
-                limit = Nothing
-              }
-          )
-          ~?= Command
-            { df = "table",
-              cols = Just ["col1", "col2"],
-              fn = Just [Pandas.GroupBy ["col1"], Aggregate Count "col2", ResetIndex]
-            },
-        translateSQL
-          ( Query
-              { select = Cols [Col "col"],
-                from = Table "table",
-                wher = Nothing,
-                groupBy = Nothing,
-                orderBy = Just ("col", Asc),
-                limit = Nothing
-              }
-          )
-          ~?= Command
-            { df = "table",
-              cols = Just ["col"],
-              fn = Just [SortValues "col" Asc]
-            },
-        translateSQL
-          ( Query
-              { select = Cols [Col "col", Col "col2"],
-                from = Table "table",
-                wher = Just $ Op2 (CompVal $ ColName "col") (Comp Gt) (CompVal $ LitInt 4),
-                groupBy = Nothing,
-                orderBy = Nothing,
-                limit = Nothing
-              }
-          )
-          ~?= Command
-            { df = "table",
-              cols = Just ["col", "col2"],
-              fn = Just [Loc $ Op2 (CompVal $ ColName "col") (Comp Gt) (CompVal $ LitInt 4)]
-            },
-        translateSQL
-          ( Query
-              { select = Cols [Col "col1", Col "col2"],
-                from = TableJoin (Join "table1" "col1" "table2" "col1" InnerJoin),
-                wher = Nothing,
-                groupBy = Nothing,
-                orderBy = Nothing,
-                limit = Nothing
-              }
-          )
-          ~?= Command
-            { df = "table1",
-              cols = Just ["col1", "col2"],
-              fn =
-                Just
-                  [ Merge
-                      MkMerge
-                        { rightDf = "table2",
-                          leftOn = "col1",
-                          rightOn = "col1",
-                          how = InnerJoin
-                        }
-                  ]
-            }
-      ]
-
-test_getFuncs :: Test
-test_getFuncs =
-  "translate SQL functions to Pandas functions"
-    ~: TestList
-      [ getFuncs
-          ( Query
-              { select = Cols [Col "col"],
-                from = Table "table",
-                wher = Nothing,
-                groupBy = Nothing,
-                orderBy = Nothing,
-                limit = Nothing
-              }
-          )
-          ~?= Nothing
-      ]
-
--- TODO: add more test cases for runParseAndTranslate (SQLParser.hs)
--- test_runParseAndTranslate :: Test
--- test_runParseAndTranslate =
---   "Testing wrapper function that takes care of Parsing + Translating"
+-- -- Converting "SELECT" expressions into list of colnames in Pandas
+-- test_selectExpToCols :: Test
+-- test_selectExpToCols =
+--   "translating SQL SELECT to Pandas"
 --     ~: TestList
---       [ runParseAndTranslate "SELECT col1, COUNT(col2)\nFROM table\nGROUP BY col1"
---           ~?= Right
---             ( Command
---                 "table"
---                 (Just ["col1", "col2"])
---                 (Just [Pandas.GroupBy ["col1"], Aggregate Count "col2"])
---             )
+--       [ selectExpToCols Star ~?= ([] :: [ColName], Nothing),
+--         selectExpToCols (Cols [Col "colA", Col "colB"]) ~?= (["colA", "colB"], Nothing),
+--         selectExpToCols (DistinctCols [Col "colA", Col "colB"])
+--           ~?= (["colA", "colB"], Just [Unique ["colA", "colB"]]),
+--         selectExpToCols (Cols [Col "colA", Agg Count "colB"])
+--           ~?= (["colA", "colB"], Just [Aggregate Count "colB"]),
+--         selectExpToCols (Cols []) ~?= ([], Nothing),
+--         selectExpToCols (DistinctCols []) ~?= ([], Nothing)
 --       ]
+
+-- test_translateJoinExp :: Test
+-- test_translateJoinExp =
+--   "translating SQL JOIN ON to Pandas Merge"
+--     ~: TestList
+--       [ translateJoinExp (Join "A" "id" "B" "id" InnerJoin)
+--           ~?= Merge
+--             MkMerge
+--               { rightDf = "B",
+--                 leftOn = "id",
+--                 rightOn = "id",
+--                 how = InnerJoin
+--               }
+--       ]
+
+-- test_translateFromExp :: Test
+-- test_translateFromExp =
+--   "translating SQL FROM to Pandas"
+--     ~: TestList
+--       [ translateFromExp (Table "A") ~?= ("A", Nothing),
+--         translateFromExp (TableJoin $ Join "A" "id" "B" "id" InnerJoin)
+--           ~?= ( "A",
+--                 Just $
+--                   Merge $
+--                     MkMerge
+--                       { rightDf = "B",
+--                         leftOn = "id",
+--                         rightOn = "id",
+--                         how = InnerJoin
+--                       }
+--               )
+--       ]
+
+-- test_whereExpToLoc :: Test
+-- test_whereExpToLoc =
+--   "translating SQL WHERE to Pandas Loc"
+--     ~: TestList
+--       [ whereExpToLoc (Just $ SQL.Op2 (SQL.CompVal (ColName "col")) (Comp Eq) (SQL.CompVal (LitString "hello")))
+--           ~?= [Loc (SQL.Op2 (SQL.CompVal (ColName "col")) (Comp Eq) (SQL.CompVal (LitString "hello")))],
+--         whereExpToLoc Nothing ~?= []
+--       ]
+
+-- test_limitExpToHead :: Test
+-- test_limitExpToHead =
+--   "translating SQL LIMIT to Pandas Head"
+--     ~: TestList
+--       [ limitExpToHead (Just 5) ~?= [Head 5],
+--         limitExpToHead Nothing ~?= []
+--       ]
+
+-- test_orderByToSortValues :: Test
+-- test_orderByToSortValues =
+--   "translating SQL ORDER BY to Pandas Sort Values"
+--     ~: TestList
+--       [ orderByToSortValues (Just ("col1", Asc)) ~?= [SortValues "col1" Asc],
+--         orderByToSortValues Nothing ~?= []
+--       ]
+
+-- test_groupByToPandasGroupBy :: Test
+-- test_groupByToPandasGroupBy =
+--   "translating SQL GROUP BY to Pandas Group By"
+--     ~: TestList
+--       [ groupByToPandasGroupBy Nothing ~?= [],
+--         groupByToPandasGroupBy (Just ["col1", "col2"]) ~?= [Pandas.GroupBy ["col1", "col2"]]
+--       ]
+
+-- test_translateSQL :: Test
+-- test_translateSQL =
+--   "translate SQL query to Pandas command"
+--     ~: TestList
+--       [ translateSQL
+--           ( Query
+--               { select = Cols [Col "col"],
+--                 from = Table "table",
+--                 wher = Nothing,
+--                 groupBy = Nothing,
+--                 orderBy = Nothing,
+--                 limit = Nothing
+--               }
+--           )
+--           ~?= Command
+--             { df = "table",
+--               cols = Just ["col"],
+--               fn = Nothing
+--             },
+--         translateSQL
+--           ( Query
+--               { select = Cols [Col "col"],
+--                 from = Table "table",
+--                 wher = Nothing,
+--                 groupBy = Nothing,
+--                 orderBy = Nothing,
+--                 limit = Just 5
+--               }
+--           )
+--           ~?= Command
+--             { df = "table",
+--               cols = Just ["col"],
+--               fn = Just [Head 5]
+--             },
+--         translateSQL
+--           ( Query
+--               { select = Cols [Col "col1", Agg Count "col2"],
+--                 from = Table "table",
+--                 wher = Nothing,
+--                 groupBy = Just ["col1"],
+--                 orderBy = Nothing,
+--                 limit = Nothing
+--               }
+--           )
+--           ~?= Command
+--             { df = "table",
+--               cols = Just ["col1", "col2"],
+--               fn = Just [Pandas.GroupBy ["col1"], Aggregate Count "col2", ResetIndex]
+--             },
+--         translateSQL
+--           ( Query
+--               { select = Cols [Col "col"],
+--                 from = Table "table",
+--                 wher = Nothing,
+--                 groupBy = Nothing,
+--                 orderBy = Just ("col", Asc),
+--                 limit = Nothing
+--               }
+--           )
+--           ~?= Command
+--             { df = "table",
+--               cols = Just ["col"],
+--               fn = Just [SortValues "col" Asc]
+--             },
+--         translateSQL
+--           ( Query
+--               { select = Cols [Col "col", Col "col2"],
+--                 from = Table "table",
+--                 wher = Just $ SQL.Op2 (SQL.CompVal $ ColName "col") (Comp Gt) (SQL.CompVal $ LitInt 4),
+--                 groupBy = Nothing,
+--                 orderBy = Nothing,
+--                 limit = Nothing
+--               }
+--           )
+--           ~?= Command
+--             { df = "table",
+--               cols = Just ["col", "col2"],
+--               fn = Just [Loc $ SQL.Op2 (SQL.CompVal $ ColName "col") (Comp Gt) (SQL.CompVal $ LitInt 4)]
+--             },
+--         translateSQL
+--           ( Query
+--               { select = Cols [Col "col1", Col "col2"],
+--                 from = TableJoin (Join "table1" "col1" "table2" "col1" InnerJoin),
+--                 wher = Nothing,
+--                 groupBy = Nothing,
+--                 orderBy = Nothing,
+--                 limit = Nothing
+--               }
+--           )
+--           ~?= Command
+--             { df = "table1",
+--               cols = Just ["col1", "col2"],
+--               fn =
+--                 Just
+--                   [ Merge
+--                       MkMerge
+--                         { rightDf = "table2",
+--                           leftOn = "col1",
+--                           rightOn = "col1",
+--                           how = InnerJoin
+--                         }
+--                   ]
+--             }
+--       ]
+
+-- test_getFuncs :: Test
+-- test_getFuncs =
+--   "translate SQL functions to Pandas functions"
+--     ~: TestList
+--       [ getFuncs
+--           ( Query
+--               { select = Cols [Col "col"],
+--                 from = Table "table",
+--                 wher = Nothing,
+--                 groupBy = Nothing,
+--                 orderBy = Nothing,
+--                 limit = Nothing
+--               }
+--           )
+--           ~?= Nothing
+--       ]
+
 
 --------------------------------------------------------------------------------
 -- PRINT unit tests
-test_printPandasCommands :: Test
-test_printPandasCommands =
-  "pretty printing Pandas commands"
-    ~: TestList
-      [ pp (Command "table" (Just ["col"]) Nothing) ~?= PP.text "table[\"col\"]",
-        pp (Command "table" (Just ["col"]) (Just [Head 5])) ~?= PP.text "table[\"col\"].head(5)",
-        pp (Pandas.Command "table" (Just ["col1", "col2"]) (Just [Pandas.GroupBy ["col1"], Pandas.Aggregate Count "col2", Pandas.ResetIndex])) ~?= PP.text "table[\"col1\",\"col2\"].groupBy(by=[\"col1\"]).agg({\"col2\":\"count\"}).reset_index()",
-        pp (Pandas.Command "table" (Just ["col"]) (Just [Pandas.SortValues "col" Asc])) ~?= PP.text "table[\"col\"].sort_values(by=[\"col\"], ascending=True)",
-        pp
-          ( Command
-              { df = "table1",
-                cols = Just ["col1", "col2"],
-                fn =
-                  Just
-                    [ Merge
-                        MkMerge
-                          { rightDf = "table2",
-                            leftOn = "col1",
-                            rightOn = "col1",
-                            how = InnerJoin
-                          }
-                    ]
-              }
-          )
-          ~?= PP.text "table1[\"col1\",\"col2\"].merge(table2, left_on=\"col1\", right_on=\"col1\", how=\"inner\")"
-      ]
+-- test_printPandasCommands :: Test
+-- test_printPandasCommands =
+--   "pretty printing Pandas commands"
+--     ~: TestList
+--       [ pp (Command "table" (Just ["col"]) Nothing) ~?= PP.text "table[\"col\"]",
+--         pp (Command "table" (Just ["col"]) (Just [Head 5])) ~?= PP.text "table[\"col\"].head(5)",
+--         pp (Pandas.Command "table" (Just ["col1", "col2"]) (Just [Pandas.GroupBy ["col1"], Pandas.Aggregate Count "col2", Pandas.ResetIndex])) ~?= PP.text "table[\"col1\",\"col2\"].groupBy(by=[\"col1\"]).agg({\"col2\":\"count\"}).reset_index()",
+--         pp (Pandas.Command "table" (Just ["col"]) (Just [Pandas.SortValues "col" Asc])) ~?= PP.text "table[\"col\"].sort_values(by=[\"col\"], ascending=True)",
+--         pp
+--           ( Command
+--               { df = "table1",
+--                 cols = Just ["col1", "col2"],
+--                 fn =
+--                   Just
+--                     [ Merge
+--                         MkMerge
+--                           { rightDf = "table2",
+--                             leftOn = "col1",
+--                             rightOn = "col1",
+--                             how = InnerJoin
+--                           }
+--                     ]
+--               }
+--           )
+--           ~?= PP.text "table1[\"col1\",\"col2\"].merge(table2, left_on=\"col1\", right_on=\"col1\", how=\"inner\")"
+--       ]
 
 --------------------------------------------------------------------------------
 -- TABLE unit tests
