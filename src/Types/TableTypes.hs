@@ -10,7 +10,6 @@ import Data.Map.Strict qualified as Map
 import Data.String (IsString (..))
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
-import Test.QuickCheck
 import Types.Types
 
 -- Maps each Table's name to the actual table

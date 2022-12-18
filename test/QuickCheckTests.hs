@@ -53,6 +53,7 @@ genFromExp =
     -- TableJoin <$> arbitrary
     ]
 
+-- TODO: figure out what to do with JoinExps
 -- Generator for Join Expressions
 -- (We mandate that the leftTable & rightTable in a join must be different)
 -- instance Arbitrary JoinExp where
@@ -153,7 +154,33 @@ instance Arbitrary Order where
 genColType :: Gen ColType
 genColType = QC.oneof [return IntC, return StringC, return DoubleC]
 
--- Generator for schemas
+instance Arbitrary ColType where
+  arbitrary = genColType
+  shrink c = [IntC]
+
+-- | Arbitrary instance for Table Schemas
+instance Arbitrary Schema where
+  arbitrary :: Gen Schema
+  arbitrary = genSchema
+
+  shrink :: Schema -> [Schema]
+  shrink schema = shrinkSchema schema
+
+-- TODO: figure out how to shrink schemas
+shrinkSchema :: Schema -> [Schema]
+shrinkSchema schema =
+  let assocs = Map.toList schema
+      shrunkNames :: [[ColName]]
+      shrunkNames = shrink (map fst assocs)
+
+      shrunkTypes :: [[ColType]]
+      shrunkTypes = shrink (map snd assocs)
+
+      shrunkAssocs :: [[(ColName, ColType)]]
+      shrunkAssocs = undefined "map (\ns ts -> zip ns ts) (zip shrunkTypes shrunkNames)"
+   in map Map.fromList shrunkAssocs
+
+-- | Generator for schemas
 genSchema :: Gen Schema
 genSchema = do
   -- Randomly generate a "pool" of column names to choose from
