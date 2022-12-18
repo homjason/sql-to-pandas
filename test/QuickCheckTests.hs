@@ -481,8 +481,19 @@ prop_roundtrip_query q = P.parse queryP (pretty q) == Right q
 prop_roundtrip_select :: SelectExp -> Bool
 prop_roundtrip_select s = P.parse selectExpP (pretty s) == Right s
 
-prop_roundtrip_from :: FromExp -> Bool
-prop_roundtrip_from f = P.parse fromExpP (pretty f) == Right f
+-- prop_roundtrip_from :: FromExp -> Bool
+-- prop_roundtrip_from f = P.parse fromExpP (pretty f) == Right f
 
 prop_roundtrip_where :: WhereExp -> Bool
 prop_roundtrip_where w = P.parse whereExpP (pretty w) == Right w
+
+-----------------------------------------------------------
+
+-- qc :: IO ()
+-- qc = do
+--   putStrLn "roundtrip_query"
+--   QC.quickCheck prop_roundtrip_query
+--   putStrLn "roundtrip_select"
+--   QC.quickCheck prop_roundtrip_select
+--   putStrLn "roundtrip_where"
+--   QC.quickCheck prop_roundtrip_where
