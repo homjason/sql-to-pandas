@@ -13,11 +13,15 @@ main = do
   case parseQuery str of
     Left error -> putStrLn error
     Right q' -> do
-      case validateQuery q' of
-        Left err -> putStrLn err
-        Right boo -> do
-          putStrLn $ pretty (translateSQL q')
-          return ()
+      putStrLn "\nPandas Result:"
+      putStrLn $ pretty (translateSQL q')
+      return ()
+
+-- case validateQuery q' of
+--   Left err -> putStrLn err
+--   Right boo -> do
+--     putStrLn $ pretty (translateSQL q')
+--     return ()
 
 -- unless (Right $ validateQuery q') (putStrLn "Query is malformed!")
 

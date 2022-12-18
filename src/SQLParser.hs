@@ -16,11 +16,26 @@ import Data.Set (Set, disjoint, isSubsetOf)
 import Data.Set qualified as Set
 import Parser (Parser)
 import Parser qualified as P
+import Print
 import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 import Translator (decompColExps, getAggCols, getAggFuncs, getColNames, getNonAggCols, translateSQL)
 import Types.PandasTypes as Pandas
 import Types.SQLTypes as SQL
+  ( Bop (..),
+    ColExp (..),
+    CompOp (Eq, Ge, Gt, Le, Lt, Neq),
+    Comparable (ColName, LitInt, LitString),
+    Condition (..),
+    FromExp (..),
+    JoinExp (..),
+    LogicOp (And, Or),
+    Query (Query),
+    SelectExp (..),
+    Uop (..),
+    WhereExp (..),
+    level,
+  )
 import Types.TableTypes
 import Types.Types
 
