@@ -201,7 +201,6 @@ joinExpP = P.mkParser $ \str -> do
   when (null joinCond) (Left "No join condition specified")
   (leftTC, remainder) <- parseResult (stringP "on" *> nameP) joinCond
   (rightTC, tl) <- parseResult (stringP "=" *> nameP) remainder
-  unless (null tl) (Left "Invalid JOIN expression")
   case (splitOn "." leftTC, splitOn "." rightTC) of
     ([leftT', leftC], [rightT', rightC]) -> do
       when
@@ -218,7 +217,7 @@ joinExpP = P.mkParser $ \str -> do
               rightCol = rightC,
               style = joinStyle
             },
-          ""
+          tl
         )
     (_, _) -> Left "Malformed JOIN condition"
 
@@ -263,8 +262,8 @@ bopP =
           constP "*" (SQL.Arith Times),
           constP "/" (SQL.Arith Divide),
           constP "%" (SQL.Arith Modulo),
-          constP "and" (SQL.Logic SQL.And),
-          constP "or" (SQL.Logic SQL.Or)
+          constP " and " (SQL.Logic SQL.And),
+          constP " or " (SQL.Logic SQL.Or)
         ]
 
 -- | Parses (postfix) unary operators

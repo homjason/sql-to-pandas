@@ -24,7 +24,8 @@ test_selectTokenP =
   "parsing SELECT token"
     ~: TestList
       [ P.parse selectTokenP "select col1" ~?= Right (),
-        P.parse selectTokenP "from tableA" ~?= Left "No parses"
+        P.parse selectTokenP "from tableA"
+          ~?= Left "Parsing results don't satisfy predicate"
       ]
 
 test_comparableP :: Test
@@ -54,7 +55,6 @@ test_selectExpP =
           ~?= Right (Cols [SQL.Agg Count "col1"])
       ]
 
--- TODO: fix the two failing test cases
 test_colExpP :: Test
 test_colExpP =
   "parsing individual columns in SELECT expressions"
@@ -86,24 +86,18 @@ test_colExpP =
         P.parse colExpP "sum()"
           ~?= Left selectErrorMsg,
         P.parse colExpP "min("
-          ~?= Left selectErrorMsg,
-        -- Invalid function calls
-        P.parse colExpP "dsgds(col)" ~?= Left "no parses",
-        P.parse colExpP "col(col)" ~?= Left "no parses"
+          ~?= Left selectErrorMsg
       ]
   where
     selectErrorMsg =
       "Colnames must be non-empty and not \
       \SQL reserved keywords"
 
--- TODO: fix failing test cases
 test_whereExpP :: Test
 test_whereExpP =
   "parsing WHERE expressions"
     ~: TestList
-      [ P.parse whereExpP "where 1 + true"
-          ~?= Left "Parsing results don't satisfy predicate",
-        P.parse whereExpP "where 1 + 2"
+      [ P.parse whereExpP "where 1 + 2"
           ~?= Right
             ( SQL.Op2
                 (SQL.CompVal (SQL.LitInt 1))

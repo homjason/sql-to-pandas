@@ -1,4 +1,4 @@
-module QuickCheckTests where
+module QuickCheckTestsAlt where
 
 import Control.Monad
 import Data.Array
@@ -14,8 +14,9 @@ import Parser (Parser)
 import Parser qualified as P
 import Print
 import SQLParser
-import Test.QuickCheck (Arbitrary (..), Gen, Property, (==>))
+import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
+import Test.QuickCheck qualified as Qc
 import Translator
 import Types.PandasTypes qualified as Pandas
 import Types.SQLTypes
@@ -31,12 +32,6 @@ sometimesGenNothing g =
       (7, Just <$> g)
     ]
 
--- Generator for an individual column name (taken from a colname pool)
-genColName :: Gen ColName
-genColName = do
-  colNames <- genColNamePool
-  QC.elements colNames
-
 -- Generator for the pool of column names ("col0", "col1", etc.)
 genColNamePool :: Gen [ColName]
 genColNamePool = do
@@ -50,29 +45,9 @@ genTableName = QC.elements tableNames
 -------------------------------------------------------------------------------
 -- Generators for schema-independent sub-components of SQL queries
 
-instance Arbitrary ColExp where
-  arbitrary :: Gen ColExp
-  arbitrary = genColExp
-
-  shrink :: ColExp -> [ColExp]
-  shrink colExp =
-    case colExp of
-      Col colName -> []
-      Agg _ colName -> [Col colName]
-
--- Generator for columns / aggregate functions in SELECT expressions
-genColExp :: Gen ColExp
-genColExp = QC.oneof [Col <$> genColName, genAgg]
-  where
-    -- Generator for Aggregate Function Expressions in SELECT
-    genAgg :: Gen ColExp
-    genAgg = do
-      fn <- arbitrary
-      Agg fn <$> genColName
-
 instance Arbitrary SelectExp where
   arbitrary :: Gen SelectExp
-  arbitrary = genSelectExp
+  arbitrary = genSelectExpOld
 
   shrink :: SelectExp -> [SelectExp]
   shrink selectExp =
@@ -81,176 +56,100 @@ instance Arbitrary SelectExp where
       DistinctCols colExps -> map Cols (shrink colExps)
       Star -> []
 
--- Generator for SELECT expressions
-genSelectExp :: Gen SelectExp
-genSelectExp =
+genSelectExpOld :: Gen SelectExp
+genSelectExpOld =
   QC.oneof
     [ Cols <$> QC.resize 3 (QC.listOf1 genColExp),
       DistinctCols <$> QC.resize 3 (QC.listOf1 genColExp),
       return Star
     ]
-
-instance Arbitrary WhereExp where
-  arbitrary = genWhereExp
-  shrink = shrinkWhereExp
-
--- Generator for WHERE expressions
-genWhereExp :: Gen WhereExp
-genWhereExp =
-  QC.oneof
-    [ liftM2 Op1 (CompVal <$> genColNameComparable) arbitrary,
-      genOp2,
-      CompVal <$> genComparable
-    ]
   where
-    -- Generator for Comparable values
-    genComparable :: Gen Comparable
-    genComparable =
-      QC.oneof
-        [ genColNameComparable,
-          genCompInt,
-          LitString <$> genSmallString
-        ]
+    -- Generator for columns / aggregate functions in SELECT expressions
+    genColExp :: Gen ColExp
+    genColExp = QC.oneof [Col <$> genColName, genAgg]
 
-    genOp2 :: Gen WhereExp
-    genOp2 = do
-      bop <- genBop
-      case bop of
-        Arith _ ->
-          liftM3
-            Op2
-            (CompVal <$> genCompInt)
-            (return bop)
-            (CompVal <$> genCompInt)
-        Comp bop' ->
-          liftM3
-            Op2
-            (CompVal <$> genComparable)
-            (return bop)
-            (CompVal <$> genComparable)
-        Logic bop' -> liftM3 Op2 genCompOpExp (return bop) genCompOpExp
-
-    -- Generator for Bops uses Arbitrary instance for binary operations
-    genBop :: Gen Bop
-    genBop =
-      QC.oneof
-        [ Comp <$> arbitrary,
-          Arith <$> arbitrary,
-          Logic <$> arbitrary
-        ]
-
-    genCompOpExp :: Gen WhereExp
-    genCompOpExp = do
-      compOp <- (arbitrary :: Gen CompOp)
-      liftM3
-        Op2
-        (CompVal <$> genComparable)
-        (return (Comp compOp))
-        (CompVal <$> genComparable)
-
-    genColNameComparable :: Gen Comparable
-    genColNameComparable = ColName <$> genColName
-
-    genCompInt :: Gen Comparable
-    genCompInt = LitInt <$> genSmallInt
-
--- Shrinker for WHERE expressions
-shrinkWhereExp :: WhereExp -> [WhereExp]
-shrinkWhereExp w =
-  case w of
-    Op1 w' uop -> shrink w'
-    Op2 w1 bop w2 -> shrink w1 ++ shrink w2
-    CompVal (ColName _) -> []
-    CompVal (LitInt n) -> map (CompVal . LitInt) (shrink n)
-    -- CompVal (LitDouble double) -> map (CompVal . LitDouble) (shrink double)
-    CompVal (LitString str) -> map (CompVal . LitString) (shrink str)
-
-genComparable :: Gen Comparable
-genComparable =
-  QC.oneof
-    [ ColName <$> genColName,
-      LitInt <$> genSmallInt,
-      LitString <$> genSmallString
-      -- LitDouble <$> genSmallDouble
-    ]
-
-instance Arbitrary FromExp where
-  arbitrary = genFromExp
-  shrink = shrinkFromExp
+    -- Generator for Aggregate Function Expressions in SELECT
+    genAgg :: Gen ColExp
+    genAgg = do
+      fn <- arbitrary
+      Agg fn <$> genColName
 
 -- Generator for FROM expressions
+-- TODO: uncomment arbitrary for JoinExps!
 genFromExp :: Gen FromExp
 genFromExp =
   QC.oneof
-    [ Table <$> genTableName,
-      TableJoin <$> arbitrary
+    [ Table <$> genTableName
+    -- TableJoin <$> arbitrary
     ]
 
--- Shrinker for FROM expressions
-shrinkFromExp :: FromExp -> [FromExp]
-shrinkFromExp fromExp =
-  case fromExp of
-    Table _ -> []
-    TableJoin joinExp ->
-      [Table (leftTable joinExp), Table (rightTable joinExp)]
-
+-- TODO: figure out what to do with JoinExps
 -- Generator for Join Expressions
 -- (We mandate that the leftTable & rightTable in a join must be different)
-instance Arbitrary JoinExp where
-  arbitrary :: Gen JoinExp
-  arbitrary = do
-    leftTable <- genTableName
-    leftCol <- genColName
-    rightTable <- genTableName `QC.suchThat` (/= leftTable)
-    rightCol <- genColName
-    style <- arbitrary
-    return $
-      Join
-        { leftTable = leftTable,
-          leftCol = leftCol,
-          rightTable = rightTable,
-          rightCol = rightCol,
-          style = style
-        }
+-- instance Arbitrary JoinExp where
+--   arbitrary :: Gen JoinExp
+--   arbitrary = do
+--     leftTable <- genTableName
+--     leftCol <- genColName
+--     rightTable <- genTableName `QC.suchThat` (/= leftTable)
+--     rightCol <- genColName
+--     style <- arbitrary
+--     return $
+--       Join
+--         { leftTable = leftTable,
+--           leftCol = leftCol,
+--           rightTable = rightTable,
+--           rightCol = rightCol,
+--           style = style
+--         }
 
 -- Arbitrary SQL queries
-instance Arbitrary Query where
-  arbitrary :: Gen Query
-  arbitrary = do
-    select <- genSelectExp
-    from <- genFromExp
-    wher <- sometimesGenNothing genWhereExp
-    groupBy <- sometimesGenNothing genGroupBy
-    orderBy <-
-      sometimesGenNothing $
-        liftM2 (,) genColName (arbitrary :: Gen Order)
-    limit <- sometimesGenNothing genSmallInt
-    return $ Query select from wher groupBy orderBy limit
+-- instance Arbitrary Query where
+--   arbitrary :: Gen Query
+--   arbitrary = do
+--     select <- genSelectExp
+--     from <- genFromExp
+--     wher <- QC.frequency [(1, return Nothing), (7, Just <$> genWhereExp)]
+--     groupBy <- QC.frequency [(1, return Nothing), (7, Just <$> genGroupBy)]
+--     orderBy <-
+--       QC.frequency
+--         [ (1, return Nothing),
+--           (7, Just <$> liftM2 (,) genColName (arbitrary :: Gen Order))
+--         ]
+--     limit <-
+--       QC.frequency
+--         [ (1, return Nothing),
+--           (7, Just <$> genSmallInt)
+--         ]
+--     return $ Query select from wher groupBy orderBy limit
 
-  shrink :: Query -> [Query]
-  shrink (Query s f w gb ob l) =
-    let shrunken =
-          [(s', f', w') | s' <- shrink s, f' <- shrink f, w' <- shrink w]
-     in map (\(s', f', w') -> Query s' f' w' Nothing Nothing Nothing) shrunken
+genGroupBy :: Schema -> Gen [ColName]
+genGroupBy schema = QC.resize 2 (QC.listOf1 (genColName schema))
 
 -- | Generator for non-empty strings of length <= 5 that
 -- only contain letters a-d
 genSmallString :: Gen String
 genSmallString = QC.resize 5 (QC.listOf1 (QC.elements "abcd"))
 
--- Generator for small Ints (between 1 & 5)
+-- Generator for small Ints (between 0 & 5)
 genSmallInt :: Gen Int
-genSmallInt = QC.chooseInt (1, 5)
+genSmallInt = QC.chooseInt (0, 5)
 
 -- Generator for small Doubles (between 0.00 & 50.00)
 genSmallDouble :: Gen Double
 genSmallDouble = QC.choose (0.00 :: Double, 50.00 :: Double)
 
-genGroupBy :: Gen [ColName]
-genGroupBy = QC.resize 2 (QC.listOf1 genColName)
-
 ----------------------------------------------------
 -- Arbitrary instances for Enum types
+
+-- Generator for Bops uses the Arbitrary instance for various binary operations
+genBop :: Gen Bop
+genBop =
+  QC.oneof
+    [ Comp <$> arbitrary,
+      Arith <$> arbitrary,
+      Logic <$> arbitrary
+    ]
 
 -- Generators for Enum types (unary & binary operators)
 -- just use QC.arbitraryBoundedEnum
@@ -283,7 +182,7 @@ instance Arbitrary Order where
 
 -- Generator for the type of a column
 genColType :: Gen ColType
-genColType = QC.oneof [return IntC, return StringC]
+genColType = QC.oneof [return IntC, return StringC, return DoubleC]
 
 instance Arbitrary ColType where
   arbitrary = genColType
@@ -375,9 +274,8 @@ genCol colLen colType =
   case colType of
     IntC -> Column <$> genIntCol colLen
     StringC -> Column <$> genStringCol colLen
+    DoubleC -> Column <$> genDoubleCol colLen
   where
-    -- DoubleC -> Column <$> genDoubleCol colLen
-
     genIntCol :: Int -> Gen [Maybe Value]
     genIntCol colLen =
       QC.vectorOf colLen $ sometimesGenNothing (IntVal <$> genSmallInt)
@@ -386,9 +284,9 @@ genCol colLen colType =
     genStringCol colLen =
       QC.vectorOf colLen $ sometimesGenNothing (StringVal <$> genSmallString)
 
--- genDoubleCol :: Int -> Gen [Maybe Value]
--- genDoubleCol colLen =
---   QC.vectorOf colLen $ sometimesGenNothing (DoubleVal <$> genSmallDouble)
+    genDoubleCol :: Int -> Gen [Maybe Value]
+    genDoubleCol colLen =
+      QC.vectorOf colLen $ sometimesGenNothing (DoubleVal <$> genSmallDouble)
 
 -- | "Wrapper" generator that randomly generates a table schema
 -- & a table that abides by that schema
@@ -459,98 +357,116 @@ accept (table, schema) (Query s f w gb ob l) =
       let (numRows, _) = dimensions table
        in n <= numRows
 
---------------------------------------------------------------------------------
+----------------------------------------------------------
+-- NEW STUFF BELOW
 
--- | Generate a small set of names for generated tests. These names are guaranteed to not include
--- reserved words
+-- | Generator for queries that are accepted by a given (schema, table) pair
+genTableQuery :: (Schema, Table) -> Gen Query
+genTableQuery (schema, table) = do
+  let (numRows, _) = dimensions table
+  select <- genSelectExp schema
+  from <- genFromExp
+  wher <- sometimesGenNothing $ genWhereExp schema
+  groupBy <- sometimesGenNothing $ genGroupBy schema
+  orderBy <-
+    sometimesGenNothing $
+      liftM2 (,) (genColName schema) (arbitrary :: Gen Order)
+  limit <- sometimesGenNothing $ QC.chooseInt (1, numRows)
+  return $ Query select from wher groupBy orderBy limit
 
--- TODO: fix!
--- prop_roundtrip_val :: Value -> Bool
--- prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
+-- | Only generate column names in a particular schema
+genColName :: Schema -> Gen ColName
+genColName schema =
+  let colNames = Map.keys schema
+   in QC.elements colNames
 
--- prop_roundtrip_query :: Query -> Bool
--- prop_roundtrip_query q = parseQuery (pretty q) == Right q
+-- | Generator for SELECT expressions based on a given schema
+genSelectExp :: Schema -> Gen SelectExp
+genSelectExp schema =
+  QC.oneof
+    [ Cols <$> QC.resize 3 (QC.listOf1 (genColExp schema)),
+      DistinctCols <$> QC.resize 3 (QC.listOf1 (genColExp schema)),
+      return Star
+    ]
+  where
+    -- Generator for columns / aggregate functions in SELECT expressions
+    genColExp :: Schema -> Gen ColExp
+    genColExp schema = QC.oneof [Col <$> genColName schema, genAgg schema]
 
--- prop_table_equality :: Query -> Bool
--- prop_table_equality q = pretty (getSQLTable q) == pretty (getPandasTable (translateSQL q))
+    -- Generator for Aggregate Function Expressions in SELECT
+    -- Looks up the type of each column in the schema to figure out
+    -- the appropriate aggregate function
+    -- Only Count, Min, Max allowed on string columns
+    -- (the latter 2 use lexicographic ordering)
+    genAgg :: Schema -> Gen ColExp
+    genAgg schema = do
+      colName <- genColName schema
+      let colType = Map.lookup colName schema
+      case colType of
+        Nothing -> return QC.discard
+        Just StringC -> do
+          fn <- QC.elements [Count, Min, Max]
+          Agg fn <$> genColName schema
+        Just _ -> do
+          fn <- arbitrary
+          Agg fn <$> genColName schema
 
--- prop_table_len :: Query -> Bool
--- prop_table_len q = length (pretty (getSQLTable q)) == length (pretty (getPandasTable (translateSQL q)))
+-- | Generator for WHERE expressions based on a given schema
+genWhereExp :: Schema -> Gen WhereExp
+genWhereExp schema =
+  QC.oneof
+    [ liftM2 Op1 (CompVal <$> genColNameComparable) arbitrary,
+      genOp2,
+      -- liftM3 Op2 (aux (n - 1)) genBop (aux (n - 1)),
+      CompVal <$> genComparable
+    ]
+  where
+    -- Generator for Comparable values
+    genComparable :: Gen Comparable
+    genComparable =
+      QC.oneof
+        [ genColNameComparable,
+          genCompInt,
+          LitString <$> genSmallString
+        ]
 
--- irrelevantFieldsAreNothing :: (Data d) => d -> Maybe d
--- irrelevantFieldsAreNothing x =
---   if fieldsAreNothing x then Nothing else Just x
+    genOp2 :: Gen WhereExp
+    genOp2 = do
+      bop <- genBop
+      case bop of
+        Arith _ ->
+          liftM3
+            Op2
+            (CompVal <$> genCompInt)
+            (return bop)
+            (CompVal <$> genCompInt)
+        Comp bop' ->
+          liftM3
+            Op2
+            (CompVal <$> genComparable)
+            (return bop)
+            (CompVal <$> genComparable)
+        Logic bop' -> liftM3 Op2 genCompOpExp (return bop) genCompOpExp
 
--- checkTableEquality :: Table --> Table
--- checkTableEquality t1 t2 = Data.List.sort t1 == Data.List.sort t2
---------------------------------------------------------------------------------
--- Permitted table & column names
+    genCompOpExp :: Gen WhereExp
+    genCompOpExp = do
+      compOp <- (arbitrary :: Gen CompOp)
+      liftM3
+        Op2
+        (CompVal <$> genComparable)
+        (return (Comp compOp))
+        (CompVal <$> genComparable)
 
--- List of permitted colnames
-colNames :: [ColName]
-colNames = ["col0", "col1", "col2", "col3", "col4"]
+    genColNameComparable :: Gen Comparable
+    genColNameComparable = ColName <$> genColName schema
 
--- List of permitted TableNames (single letters from A - Z)
-tableNames :: [TableName]
-tableNames = map (: []) ['A' .. 'Z']
+    genCompInt :: Gen Comparable
+    genCompInt = LitInt <$> genSmallInt
 
---------------------------------------------------------------------------------
--- Convenience functions for QuickCheck (independent of generators)
-quickCheckN :: QC.Testable prop => Int -> prop -> IO ()
-quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
-
---------------------------------------------------------------------------------
--- Round trip properties
-prop_roundtrip_query :: Query -> Property
-prop_roundtrip_query q@(Query s f w gb ob l) =
-  case s of
-    Cols colExps ->
-      not (null colExps) ==> P.parse queryP (pretty q) == Right q
-    DistinctCols colExps ->
-      not (null colExps) ==> P.parse queryP (pretty q) == Right q
-    _ -> QC.property (P.parse queryP (pretty q) == Right q)
-
-prop_roundtrip_select :: SelectExp -> Property
-prop_roundtrip_select s =
-  case s of
-    Star -> QC.property (P.parse selectExpP (pretty s) == Right s)
-    Cols colExps ->
-      not (null colExps) ==> P.parse selectExpP (pretty s) == Right s
-    DistinctCols colExps ->
-      not (null colExps) ==> P.parse selectExpP (pretty s) == Right s
-
-prop_roundtrip_from :: FromExp -> Bool
-prop_roundtrip_from f = P.parse fromExpP (pretty f) == Right f
-
-prop_roundtrip_where :: WhereExp -> Bool
-prop_roundtrip_where w = P.parse whereExpP ("where " <> pretty w) == Right w
-
---------------------------------------------------------------------------------
--- Other properties
-
--- | Check that Schemas only contain unique columns (no duplicate columns)
-prop_schema_uniqueCols :: Schema -> Bool
-prop_schema_uniqueCols schema =
-  let colNames = (Set.fromList . Map.keys) schema
-   in Set.size colNames == Map.size schema
-
--- Check that the getColIdxs function is injective
--- (i.e. distinct columns map to distinct column indexes)
-prop_getColIdxs_injective :: Schema -> Bool
-prop_getColIdxs_injective schema = undefined "TODO"
-
--- >>> elems (array ((0,0),(3,0)) [((0,0),Just (StringVal "b")),((1,0),Just (StringVal "acabc")),((2,0),Just (StringVal "bbdb")),((3,0),Just (StringVal "c"))])
--- [Just (StringVal "b"),Just (StringVal "acabc"),Just (StringVal "bbdb"),Just (StringVal "c")]
-
--- >>> assocs (array ((0,0),(3,0)) [((0,0),Just (StringVal "b")),((1,0),Just (StringVal "acabc")),((2,0),Just (StringVal "bbdb")),((3,0),Just (StringVal "c"))])
--- [((0,0),Just (StringVal "b")),((1,0),Just (StringVal "acabc")),((2,0),Just (StringVal "bbdb")),((3,0),Just (StringVal "c"))]
-
---------------------------------------------------------------------------------
--- qc :: IO ()
--- qc = do
---   putStrLn "roundtrip_query"
---   QC.quickCheck prop_roundtrip_query
---   putStrLn "roundtrip_select"
---   QC.quickCheck prop_roundtrip_select
---   putStrLn "roundtrip_where"
---   QC.quickCheck prop_roundtrip_where
+-- | Generator that generates a (schema, table, query) triple
+genSchemaTableQuery :: Gen (Schema, Table, Query)
+genSchemaTableQuery = do
+  schema <- genSchema
+  table <- genTable schema
+  query <- genTableQuery (schema, table)
+  return (schema, table, query)
