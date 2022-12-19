@@ -4,6 +4,10 @@ Ernest Ng (`ngernest`) and Jason Hom (`homjason`)
 Our CIS 5520 final project parses SQL queries and translates them into Pandas
 commands.
 
+Link to Grading Session slides: 
+https://docs.google.com/presentation/d/1u-P92zxm_TmoMKqKKugzSlhU1Z1GAjFlfcTDllVVAt0/edit?usp=sharing                   
+
+
 <!-- This is an "Empty project" for Haskell. It is configured in the same way as
 the lecture demo and homework assignments for CIS 5520, but contains no
 code. Feel free to use this project for experimentation!
@@ -55,8 +59,8 @@ This folder defines HUnit and QuickCheck tests for our project.
 3. [SQLParser.hs](src/SQLParser.hs)
 4. [Translator.hs](src/Translator.hs)
 5. [Print.hs](src/Print.hs)
-6. UnitTests.hs
-7. QuickCheckTests.hs
+6. [UnitTests.hs](test/UnitTests.hs)
+7. [QuickCheckTests.hs](test/QuickCheckTests.hs)
 
 ## Building, running, and testing
 
