@@ -165,54 +165,58 @@ genComparable =
       -- LitDouble <$> genSmallDouble
     ]
 
+instance Arbitrary FromExp where
+  arbitrary = genFromExp
+  shrink = shrinkFromExp
+
 -- Generator for FROM expressions
--- TODO: uncomment arbitrary for JoinExps!
 genFromExp :: Gen FromExp
 genFromExp =
   QC.oneof
-    [ Table <$> genTableName
-    -- TableJoin <$> arbitrary
+    [ Table <$> genTableName,
+      TableJoin <$> arbitrary
     ]
 
--- TODO: figure out what to do with JoinExps
+-- Shrinker for FROM expressions
+shrinkFromExp :: FromExp -> [FromExp]
+shrinkFromExp fromExp =
+  case fromExp of
+    Table _ -> []
+    TableJoin joinExp ->
+      [Table (leftTable joinExp), Table (rightTable joinExp)]
+
 -- Generator for Join Expressions
 -- (We mandate that the leftTable & rightTable in a join must be different)
--- instance Arbitrary JoinExp where
---   arbitrary :: Gen JoinExp
---   arbitrary = do
---     leftTable <- genTableName
---     leftCol <- genColName
---     rightTable <- genTableName `QC.suchThat` (/= leftTable)
---     rightCol <- genColName
---     style <- arbitrary
---     return $
---       Join
---         { leftTable = leftTable,
---           leftCol = leftCol,
---           rightTable = rightTable,
---           rightCol = rightCol,
---           style = style
---         }
+instance Arbitrary JoinExp where
+  arbitrary :: Gen JoinExp
+  arbitrary = do
+    leftTable <- genTableName
+    leftCol <- genColName
+    rightTable <- genTableName `QC.suchThat` (/= leftTable)
+    rightCol <- genColName
+    style <- arbitrary
+    return $
+      Join
+        { leftTable = leftTable,
+          leftCol = leftCol,
+          rightTable = rightTable,
+          rightCol = rightCol,
+          style = style
+        }
 
 -- Arbitrary SQL queries
--- instance Arbitrary Query where
---   arbitrary :: Gen Query
---   arbitrary = do
---     select <- genSelectExp
---     from <- genFromExp
---     wher <- QC.frequency [(1, return Nothing), (7, Just <$> genWhereExp)]
---     groupBy <- QC.frequency [(1, return Nothing), (7, Just <$> genGroupBy)]
---     orderBy <-
---       QC.frequency
---         [ (1, return Nothing),
---           (7, Just <$> liftM2 (,) genColName (arbitrary :: Gen Order))
---         ]
---     limit <-
---       QC.frequency
---         [ (1, return Nothing),
---           (7, Just <$> genSmallInt)
---         ]
---     return $ Query select from wher groupBy orderBy limit
+instance Arbitrary Query where
+  arbitrary :: Gen Query
+  arbitrary = do
+    select <- genSelectExp
+    from <- genFromExp
+    wher <- sometimesGenNothing genWhereExp
+    groupBy <- sometimesGenNothing genGroupBy
+    orderBy <-
+      sometimesGenNothing $
+        liftM2 (,) genColName (arbitrary :: Gen Order)
+    limit <- sometimesGenNothing genSmallInt
+    return $ Query select from wher groupBy orderBy limit
 
 -- | Generator for non-empty strings of length <= 5 that
 -- only contain letters a-d
@@ -226,6 +230,9 @@ genSmallInt = QC.chooseInt (0, 5)
 -- Generator for small Doubles (between 0.00 & 50.00)
 genSmallDouble :: Gen Double
 genSmallDouble = QC.choose (0.00 :: Double, 50.00 :: Double)
+
+genGroupBy :: Gen [ColName]
+genGroupBy = QC.resize 2 (QC.listOf1 genColName)
 
 ----------------------------------------------------
 -- Arbitrary instances for Enum types
@@ -500,8 +507,8 @@ prop_roundtrip_select s =
     DistinctCols colExps ->
       not (null colExps) ==> P.parse selectExpP (pretty s) == Right s
 
--- prop_roundtrip_from :: FromExp -> Bool
--- prop_roundtrip_from f = P.parse fromExpP (pretty f) == Right f
+prop_roundtrip_from :: FromExp -> Bool
+prop_roundtrip_from f = P.parse fromExpP (pretty f) == Right f
 
 prop_roundtrip_where :: WhereExp -> Bool
 prop_roundtrip_where w = P.parse whereExpP (pretty w) == Right w
