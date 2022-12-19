@@ -227,7 +227,7 @@ joinExpP = P.mkParser $ \str -> do
 -- We first parse AND/OR operators, then comparison operators,
 -- then + & -, then * & /, then (postfix) unary operators
 whereExpP :: Parser WhereExp
-whereExpP = stringP "where" *> logicP
+whereExpP = logicP
   where
     logicP = compP `P.chainl1` opAtLevel (level (SQL.Logic SQL.And))
     compP = sumP `P.chainl1` opAtLevel (level (SQL.Comp SQL.Gt))
@@ -318,7 +318,7 @@ queryP :: Parser Query
 queryP =
   Query <$> selectExpP
     <*> fromExpP
-    <*> ((whereExpP <&> Just) <|> pure Nothing))
+    <*> (stringP "where" *> ((whereExpP <&> Just) <|> pure Nothing))
     <*> ((groupByP <&> Just) <|> pure Nothing)
     <*> ((orderByP <&> Just) <|> pure Nothing)
     <*> ((limitP <&> Just) <|> pure Nothing)
