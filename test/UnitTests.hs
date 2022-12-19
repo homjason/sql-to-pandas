@@ -1065,7 +1065,130 @@ test_printPandasCommands =
                 fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col" "table") (Pandas.Comp Pandas.Gt) (Pandas.CompVal $ Pandas.LitInt 4)]
               }
           )
-          ~?= PP.text "table[\"col\",\"col2\"].loc[table[\"col\"] > 4]"
+          ~?= PP.text "table[\"col\",\"col2\"].loc[table[\"col\"] > 4]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col" "table") (Pandas.Comp Pandas.Ge) (Pandas.CompVal $ Pandas.LitInt 4)]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[table[\"col\"] >= 4]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col" "table") (Pandas.Comp Pandas.Eq) (Pandas.CompVal $ Pandas.LitInt 4)]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[table[\"col\"] == 4]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col" "table") (Pandas.Comp Pandas.Neq) (Pandas.CompVal $ Pandas.LitInt 4)]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[table[\"col\"] != 4]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col" "table") (Pandas.Comp Pandas.Lt) (Pandas.CompVal $ Pandas.LitInt 4)]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[table[\"col\"] < 4]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col" "table") (Pandas.Comp Pandas.Le) (Pandas.CompVal $ Pandas.LitInt 4)]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[table[\"col\"] <= 4]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.Op1 (Pandas.CompVal $ Pandas.ColName "col" "table") Pandas.IsNull) (Pandas.Logic Pandas.And) (Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col" "table") (Pandas.Comp Pandas.Gt) (Pandas.CompVal $ Pandas.LitInt 4))]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[table[\"col\"].isnull() & table[\"col\"] > 4]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.Op1 (Pandas.CompVal $ Pandas.ColName "col" "table") Pandas.IsNotNull) (Pandas.Logic Pandas.And) (Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col" "table") (Pandas.Comp Pandas.Gt) (Pandas.CompVal $ Pandas.LitInt 4))]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[table[\"col\"].notnull() & table[\"col\"] > 4]",
+        pp (Command {df = "table", cols = Just ["col", "col2"], fn = Just [Pandas.Unique ["col", "col2"]]}) ~?= PP.text "table[\"col\",\"col2\"].drop_duplicates(subset=[\"col\",\"col2\"])",
+        pp (Command {df = "table", cols = Just ["col", "col2"], fn = Just [Pandas.Head 5]}) ~?= PP.text "table[\"col\",\"col2\"].head(5)",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.LitInt 2) (Pandas.Arith Plus) (Pandas.CompVal $ Pandas.LitInt 0)]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[2 + 0]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.LitInt 2) (Pandas.Arith Minus) (Pandas.CompVal $ Pandas.LitInt 0)]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[2 - 0]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.LitInt 2) (Pandas.Arith Times) (Pandas.CompVal $ Pandas.LitInt 0)]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[2 * 0]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.LitInt 0) (Pandas.Arith Divide) (Pandas.CompVal $ Pandas.LitInt 2)]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[0 / 2]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.LitInt 2) (Pandas.Arith Modulo) (Pandas.CompVal $ Pandas.LitInt 2)]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[2 % 2]",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.LitInt 2) (Pandas.Arith Plus) (Pandas.CompVal $ Pandas.LitInt 0), Pandas.Head 6]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[2 + 0].head(6)"
+      ]
+
+test_printSQLQuery :: Test
+test_printSQLQuery =
+  "pretty printing SQL Queries"
+    ~: TestList
+      [ pp
+          ( Query
+              { select = Cols [Col "col"],
+                from = Table "table",
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= PP.text "select col from table"
       ]
 
 --------------------------------------------------------------------------------
@@ -1291,7 +1414,7 @@ test_translator =
       ]
 
 test_print :: IO Counts
-test_print = runTestTT $ TestList [test_printPandasCommands]
+test_print = runTestTT $ TestList [test_printPandasCommands, test_printSQLQuery]
 
 test_table :: IO Counts
 test_table = runTestTT $ TestList [test_dimensions, test_tableToList]
