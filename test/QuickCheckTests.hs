@@ -107,27 +107,16 @@ genWhereExp =
     genComparable :: Gen Comparable
     genComparable =
       QC.oneof
-        [ genColNameComparable,
-          genCompInt,
-          LitString <$> genSmallString
-        ]
+        [ genColNameComparable, genCompInt, LitString <$> genSmallString]
 
     genOp2 :: Gen WhereExp
     genOp2 = do
       bop <- genBop
       case bop of
         Arith _ ->
-          liftM3
-            Op2
-            (CompVal <$> genCompInt)
-            (return bop)
-            (CompVal <$> genCompInt)
-        Comp bop' ->
-          liftM3
-            Op2
-            (CompVal <$> genComparable)
-            (return bop)
-            (CompVal <$> genComparable)
+          liftM3 Op2 (CompVal <$> genCompInt) (return bop) (CompVal <$> genCompInt)
+        Comp bop' -> 
+          liftM3 Op2 (CompVal <$> genComparable) (return bop) (CompVal <$> genComparable)
         Logic bop' -> liftM3 Op2 genCompOpExp (return bop) genCompOpExp
 
     -- Generator for Bops uses Arbitrary instance for binary operations
