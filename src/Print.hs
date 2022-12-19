@@ -227,7 +227,8 @@ instance PP SQL.Comparable where
   pp (ColName cn) = PP.text cn
   pp (LitInt i) = PP.int i
   pp (LitString s) = PP.text $ show s
-  pp (LitDouble d) = PP.double d
+
+-- pp (LitDouble d) = PP.double d
 
 instance PP SQL.Uop where
   pp IsNull = PP.text "is null"
@@ -240,7 +241,7 @@ instance PP SQL.Bop where
 
 instance PP SQL.CompOp where
   pp Eq = PP.char '='
-  pp Neq = PP.text "<>"
+  pp Neq = PP.text "!="
   pp Gt = PP.char '>'
   pp Ge = PP.text ">="
   pp Lt = PP.char '<'

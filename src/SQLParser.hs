@@ -276,7 +276,6 @@ uopP =
     ]
 
 -- | Parser for Comparable values
--- TODO: handle LitDouble
 comparableP :: Parser SQL.Comparable
 comparableP =
   P.choice
@@ -319,7 +318,7 @@ queryP :: Parser Query
 queryP =
   Query <$> selectExpP
     <*> fromExpP
-    <*> ((whereExpP <&> Just) <|> pure Nothing)
+    <*> ((whereExpP <&> Just) <|> pure Nothing))
     <*> ((groupByP <&> Just) <|> pure Nothing)
     <*> ((orderByP <&> Just) <|> pure Nothing)
     <*> ((limitP <&> Just) <|> pure Nothing)

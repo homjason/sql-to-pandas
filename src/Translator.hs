@@ -144,7 +144,7 @@ sqlToPandasCompVal comp df = case comp of
   SQL.ColName s -> Pandas.ColName s df
   SQL.LitInt n -> Pandas.LitInt n
   SQL.LitString s -> Pandas.LitString s
-  SQL.LitDouble x -> Pandas.LitDouble x
+  -- SQL.LitDouble x -> Pandas.LitDouble x
 
 whereExpToBoolExp :: WhereExp -> TableName -> BoolExp
 whereExpToBoolExp we df = case we of

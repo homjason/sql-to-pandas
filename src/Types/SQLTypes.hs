@@ -83,7 +83,7 @@ data Comparable
   = ColName ColName -- column name
   | LitInt Int -- literal ints (positive / negative)
   | LitString String -- literal strings
-  | LitDouble Double -- literal doubles
+  --  | LitDouble Double -- literal doubles
   deriving (Eq, Show)
 
 -- Postfix unary operators for checking if a column is null / not-null

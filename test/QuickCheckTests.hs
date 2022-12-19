@@ -16,7 +16,6 @@ import Print
 import SQLParser
 import Test.QuickCheck (Arbitrary (..), Gen, Property, (==>))
 import Test.QuickCheck qualified as QC
-import Test.QuickCheck qualified as Qc
 import Translator
 import Types.PandasTypes qualified as Pandas
 import Types.SQLTypes
@@ -51,26 +50,25 @@ genTableName = QC.elements tableNames
 -------------------------------------------------------------------------------
 -- Generators for schema-independent sub-components of SQL queries
 
-instance Arbitrary ColExp where 
+instance Arbitrary ColExp where
   arbitrary :: Gen ColExp
   arbitrary = genColExp
-  
+
   shrink :: ColExp -> [ColExp]
-  shrink colExp = 
-    case colExp of 
+  shrink colExp =
+    case colExp of
       Col colName -> []
       Agg _ colName -> [Col colName]
 
 -- Generator for columns / aggregate functions in SELECT expressions
 genColExp :: Gen ColExp
 genColExp = QC.oneof [Col <$> genColName, genAgg]
-  where 
+  where
     -- Generator for Aggregate Function Expressions in SELECT
     genAgg :: Gen ColExp
     genAgg = do
       fn <- arbitrary
       Agg fn <$> genColName
-
 
 instance Arbitrary SelectExp where
   arbitrary :: Gen SelectExp
@@ -83,6 +81,7 @@ instance Arbitrary SelectExp where
       DistinctCols colExps -> map Cols (shrink colExps)
       Star -> []
 
+-- Generator for SELECT expressions
 genSelectExp :: Gen SelectExp
 genSelectExp =
   QC.oneof
@@ -90,7 +89,82 @@ genSelectExp =
       DistinctCols <$> QC.resize 3 (QC.listOf1 genColExp),
       return Star
     ]
-    
+
+instance Arbitrary WhereExp where
+  arbitrary = genWhereExp
+  shrink = shrinkWhereExp
+
+-- Generator for WHERE expressions
+genWhereExp :: Gen WhereExp
+genWhereExp =
+  QC.oneof
+    [ liftM2 Op1 (CompVal <$> genColNameComparable) arbitrary,
+      genOp2,
+      CompVal <$> genComparable
+    ]
+  where
+    -- Generator for Comparable values
+    genComparable :: Gen Comparable
+    genComparable =
+      QC.oneof
+        [ genColNameComparable,
+          genCompInt,
+          LitString <$> genSmallString
+        ]
+
+    genOp2 :: Gen WhereExp
+    genOp2 = do
+      bop <- genBop
+      case bop of
+        Arith _ ->
+          liftM3
+            Op2
+            (CompVal <$> genCompInt)
+            (return bop)
+            (CompVal <$> genCompInt)
+        Comp bop' ->
+          liftM3
+            Op2
+            (CompVal <$> genComparable)
+            (return bop)
+            (CompVal <$> genComparable)
+        Logic bop' -> liftM3 Op2 genCompOpExp (return bop) genCompOpExp
+
+    genCompOpExp :: Gen WhereExp
+    genCompOpExp = do
+      compOp <- (arbitrary :: Gen CompOp)
+      liftM3
+        Op2
+        (CompVal <$> genComparable)
+        (return (Comp compOp))
+        (CompVal <$> genComparable)
+
+    genColNameComparable :: Gen Comparable
+    genColNameComparable = ColName <$> genColName
+
+    genCompInt :: Gen Comparable
+    genCompInt = LitInt <$> genSmallInt
+
+-- Shrinker for WHERE expressions
+shrinkWhereExp :: WhereExp -> [WhereExp]
+shrinkWhereExp w =
+  case w of
+    Op1 w' uop -> shrink w'
+    Op2 w1 bop w2 -> shrink w1 ++ shrink w2
+    CompVal (ColName _) -> []
+    CompVal (LitInt n) -> map (CompVal . LitInt) (shrink n)
+    -- CompVal (LitDouble double) -> map (CompVal . LitDouble) (shrink double)
+    CompVal (LitString str) -> map (CompVal . LitString) (shrink str)
+
+genComparable :: Gen Comparable
+genComparable =
+  QC.oneof
+    [ ColName <$> genColName,
+      LitInt <$> genSmallInt,
+      LitString <$> genSmallString
+      -- LitDouble <$> genSmallDouble
+    ]
+
 -- Generator for FROM expressions
 -- TODO: uncomment arbitrary for JoinExps!
 genFromExp :: Gen FromExp
@@ -139,9 +213,9 @@ genFromExp =
 --           (7, Just <$> genSmallInt)
 --         ]
 --     return $ Query select from wher groupBy orderBy limit
+
 -- | Generator for non-empty strings of length <= 5 that
 -- only contain letters a-d
-
 genSmallString :: Gen String
 genSmallString = QC.resize 5 (QC.listOf1 (QC.elements "abcd"))
 
@@ -196,7 +270,7 @@ instance Arbitrary Order where
 
 -- Generator for the type of a column
 genColType :: Gen ColType
-genColType = QC.oneof [return IntC, return StringC, return DoubleC]
+genColType = QC.oneof [return IntC, return StringC]
 
 instance Arbitrary ColType where
   arbitrary = genColType
@@ -288,8 +362,9 @@ genCol colLen colType =
   case colType of
     IntC -> Column <$> genIntCol colLen
     StringC -> Column <$> genStringCol colLen
-    DoubleC -> Column <$> genDoubleCol colLen
   where
+    -- DoubleC -> Column <$> genDoubleCol colLen
+
     genIntCol :: Int -> Gen [Maybe Value]
     genIntCol colLen =
       QC.vectorOf colLen $ sometimesGenNothing (IntVal <$> genSmallInt)
@@ -298,9 +373,9 @@ genCol colLen colType =
     genStringCol colLen =
       QC.vectorOf colLen $ sometimesGenNothing (StringVal <$> genSmallString)
 
-    genDoubleCol :: Int -> Gen [Maybe Value]
-    genDoubleCol colLen =
-      QC.vectorOf colLen $ sometimesGenNothing (DoubleVal <$> genSmallDouble)
+-- genDoubleCol :: Int -> Gen [Maybe Value]
+-- genDoubleCol colLen =
+--   QC.vectorOf colLen $ sometimesGenNothing (DoubleVal <$> genSmallDouble)
 
 -- | "Wrapper" generator that randomly generates a table schema
 -- & a table that abides by that schema
@@ -417,22 +492,13 @@ prop_roundtrip_query :: Query -> Bool
 prop_roundtrip_query q = P.parse queryP (pretty q) == Right q
 
 prop_roundtrip_select :: SelectExp -> Property
-prop_roundtrip_select s = 
-  case s of 
+prop_roundtrip_select s =
+  case s of
     Star -> QC.property (P.parse selectExpP (pretty s) == Right s)
-    Cols colExps -> not (null colExps) ==> P.parse selectExpP (pretty s) == Right s
-    DistinctCols colExps -> not (null colExps) ==> P.parse selectExpP (pretty s) == Right s
-    
-
--- >>> pretty (Cols [Col "col1"])
--- "SELECT col1\n"
-
--- >>> P.parse selectExpP $ pretty (Cols [Col "col1"])
--- Left "No parses"
-
--- >>> P.parse selectExpP "select col1\n"
--- Right (Cols [Col "col1"])
-
+    Cols colExps ->
+      not (null colExps) ==> P.parse selectExpP (pretty s) == Right s
+    DistinctCols colExps ->
+      not (null colExps) ==> P.parse selectExpP (pretty s) == Right s
 
 -- prop_roundtrip_from :: FromExp -> Bool
 -- prop_roundtrip_from f = P.parse fromExpP (pretty f) == Right f

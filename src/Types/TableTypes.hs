@@ -40,8 +40,10 @@ type Table = Array (Int, Int) (Maybe Value)
 data Value
   = IntVal Int -- 1
   | StringVal String -- "abd"
-  | DoubleVal Double -- 64-bit
   deriving (Eq, Show, Ord)
+  
+-- | DoubleVal Double -- 64-bit
+  
 
 -- Initial table name
 initTableName :: TableName
@@ -72,7 +74,7 @@ initialStore = Map.singleton initTableName initTable
 type Schema = Map ColName ColType
 
 -- Permitted types for columns
-data ColType = IntC | StringC | DoubleC
+data ColType = IntC | StringC
   deriving (Show, Eq, Ord)
 
 -- Data type representing a column
