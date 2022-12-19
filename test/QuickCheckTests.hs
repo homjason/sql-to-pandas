@@ -434,7 +434,7 @@ accept (table, schema) (Query s f w gb ob l) =
       let (numRows, _) = dimensions table
        in n <= numRows
 
---------------------------------------------------------------------------------
+------------------------------------------------------------------------------
 
 -- List of permitted TableNames (single letters from A - Z)
 tableNames :: [TableName]
