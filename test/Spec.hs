@@ -21,4 +21,7 @@ main = do
   putStrLn "RUN OVERALL TESTS"
   test_pipeline
   putStrLn "----------------------------"
+  putStrLn "RUN QUICKCHECK TESTS"
+  qc
+  putStrLn "----------------------------"
   return ()

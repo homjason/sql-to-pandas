@@ -383,8 +383,6 @@ test_orderByP =
           ~?= Left "Invalid ORDER BY expression"
       ]
 
--- >>> runTestTT test_parseQuery
-
 test_parseQuery :: Test
 test_parseQuery =
   "parsing SQL Queries"
@@ -472,11 +470,6 @@ test_parseQuery =
             )
       ]
 
--- >>> runTestTT test_parseQuery
-
--- >>> runTestTT test_P.parse fromExpP
--- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
-
 test_fromExpP :: Test
 test_fromExpP =
   "parsing FROM expressions"
@@ -504,19 +497,6 @@ test_fromExpP =
                     style = LeftJoin
                   }
             )
-            -- P.parse fromExpP "from (select col from B)"
-            --   ~?= Right
-            --     ( SubQuery
-            --         Query
-            --           { select = Cols [Col "col"],
-            --             from = Table "B" Nothing,
-            --             wher = Nothing,
-            --             groupBy = Nothing,
-            --             limit = Nothing,
-            --             orderBy = Nothing
-            --           }
-            --         Nothing
-            --     )
       ]
 
 test_joinExpP :: Test
@@ -563,8 +543,6 @@ test_joinExpP =
           ~?= Left "Can't join the same table with itself",
         P.parse joinExpP "a join b"
           ~?= Left "No join condition specified",
-        P.parse joinExpP "a join b on a.col = b.col arbitrarySuffix"
-          ~?= Left "Invalid JOIN expression",
         P.parse joinExpP "a invalidJoin b on a.col = b.col"
           ~?= Left "Parsing results don't satisfy predicate",
         P.parse joinExpP "a join b on aCol = bCol"
@@ -573,23 +551,8 @@ test_joinExpP =
           ~?= Left "No parses"
       ]
 
--- test_doubleValP :: Test
--- test_doubleValP =
---   "parsing literal doubles"
---     ~: TestList
---       [ P.parse doubleValP "5.52" ~?= Right (DoubleVal (5.52 :: Double)),
---         P.parse doubleValP "-2.25" ~?= Right (DoubleVal (2.25 :: Double)),
---         P.parse doubleValP "0.00" ~?= Right (DoubleVal (0.0 :: Double)),
---         P.parse doubleValP "1.00" ~?= Right (DoubleVal (1.0 :: Double)),
---         P.parse doubleValP "-3.00" ~?= Right (DoubleVal (-3.0 :: Double))
---       ]
-
 --------------------------------------------------------------------------------
 -- Unit Tests for validateQuery & its helper functions
-
--- >>> runTestTT test_validateQuery
--- Counts {cases = 8, tried = 8, errors = 0, failures = 0}
-
 test_validateQuery :: Test
 test_validateQuery =
   "checking SQL query validation"
@@ -1262,11 +1225,7 @@ test_runParseTranslatePrint =
     ~: TestList
       [ runSqlToPandas "select Artist, count(Position) from rankings_df where position=1 group by Artist order by artist desc limit 10"
           ~?= "rankings_df[\"artist\",\"position\"].loc[rankings_df[\"position\"] == 1].groupby(by=[\"artist\"]).agg({\"position\":\"count\"}).sort_values(by=[\"artist\"], ascending=False).head(10).reset_index()"
-          -- "rankings_df[rankings_df[\"count(Position)\']==1].groupby([\'Artist\']).count().sort_values(by=\'count(Position)\',ascending=False).head(10).reset_index()[['Artist','Position']]"
       ]
-
--- >>> parseQuery "select Artist, count(Position) from rankings_df where position=1 group by Artist order by artist desc limit 10"
--- Right (Query {select = Cols [Col "artist",Agg Count "position"], from = Table "rankings_df", wher = Just (Op2 (CompVal (ColName "position")) (Comp Eq) (CompVal (LitInt 1))), groupBy = Just ["artist"], orderBy = Just ("artist",Desc), limit = Just 10})
 
 --------------------------------------------------------------------------------
 -- TABLE unit tests
@@ -1409,28 +1368,6 @@ test_tableToList =
               ]
       ]
 
--- test_colToValue :: Test
--- test_colToValue =
---   "testing colToValue"
---     ~: TestList
---       [ colToValue (IntCol [])
---           ~?= [],
---         colToValue (IntCol [Just 1, Nothing, Just 3])
---           ~?= [Just (IntVal 1), Nothing, Just (IntVal 3)],
---         colToValue (IntCol [Nothing, Nothing, Nothing])
---           ~?= [Nothing, Nothing, Nothing],
---         colToValue (StringCol [Just "1st", Just "2nd", Just "3rd"])
---           ~?= [ Just (StringVal "1st"),
---                 Just (StringVal "2nd"),
---                 Just (StringVal "3rd")
---               ],
---         colToValue (DoubleCol [Just 1.11, Just 2.22, Just 3.33])
---           ~?= [ Just (DoubleVal 1.11),
---                 Just (DoubleVal 2.22),
---                 Just (DoubleVal 3.33)
---               ]
---       ]
-
 --------------------------------------------------------------------------------
 -- Overall Testing
 test_sql_parser :: IO Counts
@@ -1461,20 +1398,6 @@ test_validate_query =
         test_distinctHasNoAggFuncs,
         test_noDistinctAndGroupBy
       ]
-
--- test_translator =
---   runTestTT $
---     TestList
---       [ test_selectExpToCols,
---         test_translateJoinExp,
---         test_translateFromExp,
---         test_whereExpToLoc,
---         test_limitExpToHead,
---         test_orderByToSortValues,
---         test_groupByToPandasGroupBy,
---         test_translateSQL,
---         test_getFuncs
---       ]
 
 test_translator =
   runTestTT $

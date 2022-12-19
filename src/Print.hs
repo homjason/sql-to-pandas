@@ -49,34 +49,6 @@ mapJoinStyleToPandasSyntax js = case js of
   RightJoin -> "right"
   InnerJoin -> "inner"
 
--- TODO: define instances of the PP typeclass
--- (eg. PP for binary / unary operators, etc.)
--- instance PP Pandas.Func where
--- pp (DropDuplicates colNames) =
---   case colNames of
---     Nothing -> PP.text ".drop_duplicates()"
---     Just ss -> PP.text (".drop_duplicates(subset=" ++ show ss ++ "))")
--- pp (Pandas.SortValues cName o) = PP.text (".sort_values(by=[\"" ++ show cName ++ "\"], ascending=" ++ show (convertOrdToBool o) ++ ")")
--- pp (Pandas.Rename colNameMap) = undefined
--- pp (Pandas.GroupBy colNames) = PP.text (".groupBy(by=" ++ show colNames ++ ")")
--- pp (Pandas.Aggregate fn col) = undefined
--- pp (Pandas.Loc whereExp) = undefined
--- pp (Pandas.Merge mergeExp) = pp mergeExp
--- pp (Pandas.Unique colNames) = PP.text (".drop_duplicates(subset=" ++ show colNames ++ ")")
--- pp (Pandas.Head n) = PP.text (".head(" ++ show n ++ ")")
--- pp Pandas.ResetIndex = PP.text ".reset_index()"
-
--- printFn :: Pandas.Func -> String
--- printFn (Pandas.SortValues cName o) = ".sort_values(by=[" ++ show cName ++ "], ascending=" ++ show (convertOrdToBool o) ++ ")"
--- printFn (Pandas.Rename colNameMap) = undefined
--- printFn (Pandas.GroupBy colNames) = ".groupBy(by=" ++ show colNames ++ ")"
--- printFn (Pandas.Aggregate fn col) = ".agg({" ++ show col ++ ":" ++ show (lowerAggName (show fn)) ++ "})"
--- printFn (Pandas.Loc boolExp) = undefined
--- printFn (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = ".merge(" ++ rightDf ++ ", left_on=" ++ show leftOn ++ ", right_on=" ++ show rightOn ++ ", how=" ++ show (mapJoinStyleToPandasSyntax how) ++ ")"
--- printFn (Pandas.Unique colNames) = ".drop_duplicates(subset=" ++ show colNames ++ ")"
--- printFn (Pandas.Head n) = ".head(" ++ show n ++ ")"
--- printFn Pandas.ResetIndex = ".reset_index()"
-
 instance PP Pandas.Func where
   pp (Pandas.SortValues cName o) = PP.text $ ".sort_values(by=[" ++ show cName ++ "], ascending=" ++ show (convertOrdToBool o) ++ ")"
   pp (Pandas.Rename colNameMap) = undefined
@@ -120,12 +92,6 @@ instance PP Pandas.LogicOp where
   pp Pandas.And = PP.char '&'
   pp Pandas.Or = PP.char '|'
 
--- instance PP Pandas.Comparable where
---   pp (ColName cn) = PP.text cn
---   pp (LitInt i) = PP.int i
---   pp (LitString s) = PP.text $ show s
---   pp (LitDouble d) = PP.double d
-
 instance PP Pandas.MergeExp where
   pp (Pandas.MkMerge rightDf leftOn rightOn how) = PP.text (".merge(" ++ show rightDf ++ ", left_on=\"" ++ show leftOn ++ "\", right_on=\"" ++ show rightOn ++ "\", how=\"" ++ show how ++ "\")")
 
@@ -141,18 +107,6 @@ instance PP Pandas.Command where
     (Just cs, Nothing) -> PP.text (df <> show cs)
     (Nothing, Just fs) -> PP.text df <> foldr (\f acc -> pp f <> acc) PP.empty fs
     (Just cs, Just fs) -> PP.text (df <> show cs) <> foldr (\f acc -> pp f <> acc) PP.empty fs
-
--- >>> pp (Command "table" (Just ["col"]) Nothing)
--- table["col"]
-
--- >>> pp (Command "table" (Just ["col"]) (Just [Head 5]))
--- table["col"].head(5)
-
--- >>> pp (Pandas.Command "table" (Just ["col1", "col2"]) (Just [Pandas.GroupBy ["col1"], Pandas.Aggregate Count "col2", Pandas.ResetIndex]))
--- table["col1","col2"].groupBy(by=["col1"]).agg({"col2":"count"}).reset_index()
-
--- >>> pp (Pandas.Command "table" (Just ["col"]) (Just [Pandas.SortValues "col" Asc]))
--- table["col"].sort_values(by=["col"], ascending=True)
 
 {-
   Pretty printing for SQL Queries. This will be used for QuickCheck testing
@@ -193,19 +147,6 @@ instance PP SelectExp where
 instance PP ColExp where
   pp (Col cName) = PP.text cName
   pp (Agg fn cName) = PP.text $ lowerName (show fn) <> "(" <> cName <> ")"
-
--- colExpToString :: ColExp -> String
---   colExpToString (Col cName) = cName
---   colExpToString (Agg fn cName) = lowerAggName (show fn) <> "(" <> cName <> ")"
-
--- >>> pp (Cols [Col "col1", Col "col2", Col "col3", Col "col4", Col "col5"])
--- SELECT col1,col2,col3,col4,col5
-
--- >>> pp (DistinctCols [Col "col1", Agg Sum "col2"])
--- SELECT DISTINCT col1,sum(col2)
-
--- >>> pp (Star)
--- SELECT *
 
 mapJoinStyleToSQLSyntax :: JoinStyle -> String
 mapJoinStyleToSQLSyntax js = case js of
@@ -257,24 +198,3 @@ instance PP ArithOp where
 instance PP SQL.LogicOp where
   pp And = PP.text "and"
   pp Or = PP.text "or"
-
--- >>> pp (Op2 (CompVal (ColName "c1")) (Comp Gt) (CompVal (LitInt 5)))
--- c1 > 5
-
--- >>> pp (Op1 (CompVal (ColName "c1")) IsNull)
--- c1 IS NULL
-
--- >>> pp (Table "t1")
--- FROM t1
-
--- >>> pp (TableJoin (Join "A" "col1" "B" "col2" InnerJoin))
--- FROM A join B ON A.col1 = B.col2
-
-instance PP Row where
-  pp = undefined
-
-instance PP Table where
-  pp = undefined
-
-instance PP Value where
-  pp = undefined

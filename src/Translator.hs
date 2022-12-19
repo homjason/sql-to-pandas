@@ -16,7 +16,6 @@ import Types.TableTypes
 import Types.Types
 
 -- Wrapper function that takes in a Pandas Query and outputs a Pandas Block
--- TODO: handle SelectExp & add reset_index
 translateSQL :: Query -> Command
 translateSQL q@(Query s f w gb ob l) =
   let cols = getColsFromSelectTranslation (selectExpToCols s)
@@ -35,9 +34,6 @@ moveResetIndex fns =
       let newFns = delete ResetIndex fns
        in newFns ++ [ResetIndex]
     else fns
-
--- >>> moveResetIndex [Pandas.GroupBy ["col1"], ResetIndex, Aggregate Count "col2"]
--- [GroupBy ["col1"],Aggregate Count "col2",ResetIndex]
 
 -- | Given a SQL query, extracts a list of (equivalent) Pandas functions
 getFuncs :: Query -> TableName -> Maybe [Func]
@@ -144,7 +140,8 @@ sqlToPandasCompVal comp df = case comp of
   SQL.ColName s -> Pandas.ColName s df
   SQL.LitInt n -> Pandas.LitInt n
   SQL.LitString s -> Pandas.LitString s
-  -- SQL.LitDouble x -> Pandas.LitDouble x
+
+-- SQL.LitDouble x -> Pandas.LitDouble x
 
 whereExpToBoolExp :: WhereExp -> TableName -> BoolExp
 whereExpToBoolExp we df = case we of
