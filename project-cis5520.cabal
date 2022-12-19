@@ -99,7 +99,6 @@ library
       Types.Types
       Parser
       Print
-      State
       SQLParser
       Translator
   hs-source-dirs:
