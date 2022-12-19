@@ -1224,7 +1224,19 @@ test_runParseTranslatePrint =
   "Running the entire pipeline: given sql query string, print pandas command"
     ~: TestList
       [ runSqlToPandas "select Artist, count(Position) from rankings_df where position=1 group by Artist order by artist desc limit 10"
-          ~?= "rankings_df[\"artist\",\"position\"].loc[rankings_df[\"position\"] == 1].groupby(by=[\"artist\"]).agg({\"position\":\"count\"}).sort_values(by=[\"artist\"], ascending=False).head(10).reset_index()"
+          ~?= "rankings_df[\"artist\",\"position\"].loc[rankings_df[\"position\"] == 1].groupby(by=[\"artist\"]).agg({\"position\":\"count\"}).sort_values(by=[\"artist\"], ascending=False).head(10).reset_index()",
+        runSqlToPandas "SELECT col\nFROM table" ~?= "table[\"col\"]",
+        runSqlToPandas "SELECT * FROM Songs" ~?= "songs",
+        runSqlToPandas "SELECT col1\nFROM table\nLIMIT 5" ~?= "table[\"col1\"].head(5)",
+        runSqlToPandas "SELECT col1, COUNT(col2)\nFROM table\nGROUP BY col1" ~?= "table[\"col1\",\"col2\"].groupby(by=[\"col1\"]).agg({\"col2\":\"count\"}).reset_index()",
+        runSqlToPandas "SELECT col\nFROM table\nORDER BY col ASC" ~?= "table[\"col\"].sort_values(by=[\"col\"], ascending=True)",
+        runSqlToPandas "SELECT col, col2\nFROM table\nWHERE col > 4" ~?= "table[\"col\",\"col2\"].loc[table[\"col\"] > 4]",
+        runSqlToPandas "SELECT col1, col2\nFROM table1 JOIN table2 ON table1.col1 = table2.col1" ~?= "table1[\"col1\",\"col2\"].merge(table2, left_on=\"col1\", right_on=\"col1\", how=\"inner\")",
+        runSqlToPandas "select col1 \n from table \n where col1 > 0\n group by col1 \n order by col1 asc \n limit 5" ~?= "table[\"col1\"].loc[table[\"col1\"] > 0].groupby(by=[\"col1\"]).sort_values(by=[\"col1\"], ascending=True).head(5).reset_index()",
+        runSqlToPandas "" ~?= "No parses",
+        runSqlToPandas "SELECT * FROM songs_df WHERE duration_min >= 3 and duration_min <= 5" ~?= "songs_df.loc[songs_df[\"duration_min\"] >= 3 & songs_df[\"duration_min\"] <= 5]",
+        runSqlToPandas "SELECT * FROM songs_df WHERE duration_min < 2 or duration_min > 5" ~?= "songs_df.loc[songs_df[\"duration_min\"] < 2 | songs_df[\"duration_min\"] > 5]",
+        runSqlToPandas "SELECT * FROM songs_df WHERE duration_min = 3 or duration_min != 5" ~?= "songs_df.loc[songs_df[\"duration_min\"] == 3 | songs_df[\"duration_min\"] != 5]"
       ]
 
 --------------------------------------------------------------------------------

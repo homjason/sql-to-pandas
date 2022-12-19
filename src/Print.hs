@@ -51,7 +51,6 @@ mapJoinStyleToPandasSyntax js = case js of
 
 instance PP Pandas.Func where
   pp (Pandas.SortValues cName o) = PP.text $ ".sort_values(by=[" ++ show cName ++ "], ascending=" ++ show (convertOrdToBool o) ++ ")"
-  pp (Pandas.Rename colNameMap) = undefined
   pp (Pandas.Group colNames) = PP.text $ ".groupby(by=" ++ show colNames ++ ")"
   pp (Pandas.Aggregate fn col) = PP.text $ ".agg({" ++ show col ++ ":" ++ show (lowerName (show fn)) ++ "})"
   pp (Pandas.Loc boolExp) = PP.text ".loc[" <> pp boolExp <> PP.text "]"
@@ -104,9 +103,9 @@ instance PP Pandas.Block where
 instance PP Pandas.Command where
   pp (Pandas.Command df cols fns) = case (cols, fns) of
     (Nothing, Nothing) -> PP.text df
-    (Just cs, Nothing) -> PP.text (df <> show cs)
+    (Just cs, Nothing) -> PP.text (df <> (if null cs then "" else show cs))
     (Nothing, Just fs) -> PP.text df <> foldr (\f acc -> pp f <> acc) PP.empty fs
-    (Just cs, Just fs) -> PP.text (df <> show cs) <> foldr (\f acc -> pp f <> acc) PP.empty fs
+    (Just cs, Just fs) -> PP.text (df <> (if null cs then "" else show cs)) <> foldr (\f acc -> pp f <> acc) PP.empty fs
 
 {-
   Pretty printing for SQL Queries. This will be used for QuickCheck testing
@@ -164,8 +163,6 @@ instance PP SQL.Comparable where
   pp (ColName cn) = PP.text cn
   pp (LitInt i) = PP.int i
   pp (LitString s) = PP.text $ show s
-
--- pp (LitDouble d) = PP.double d
 
 instance PP SQL.Uop where
   pp IsNull = PP.text "is null"

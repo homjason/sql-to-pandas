@@ -42,7 +42,6 @@ instance Monoid Block where
 -- For AggFunc, the 1st ColName arg is the column we're aggregating over
 data Func
   = SortValues ColName Order
-  | Rename (Map ColName ColName)
   | Group [ColName]
   | Aggregate AggFunc ColName
   | Loc BoolExp -- filtering on rows (akin to WHERE in SQL)
