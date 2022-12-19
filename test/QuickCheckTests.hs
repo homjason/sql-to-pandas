@@ -312,44 +312,27 @@ genSchema = do
 genTable :: Schema -> Gen Table
 genTable schema
   | schema == Map.empty = return QC.discard
-  | otherwise = do
-    let numCols = Map.size schema
+  | otherwise = do 
     -- Arbitrarily generate the no. of rows
     numRows <- QC.chooseInt (1, 5)
 
-    -- colToIdx :: Map ColName Int
-    -- Map from colnames to indexes
-    let colToIdx = getColIdxs schema
+    -- Map each column indexes to the generator for that Column
+    let numCols = Map.size schema
+        colToIdx = getColIdxs schema
+        colToGen = Map.mapWithKey (\_ cType -> genCol numRows cType) schema
+        idxToGen = colToGen `Map.compose` invertMap colToIdx
 
-    -- colToGenerator :: Map ColName (Gen Column)
-    -- Map each colname to the generator for that column
-    let colToGen = Map.mapWithKey (\_ cType -> genCol numRows cType) schema
-
-    -- idxToGenerator :: Map Int (Gen Column)
-    -- Map each column index to the generator for that column
-    let idxToGen = colToGen `Map.compose` invertMap colToIdx
-
-    -- colMap :: Map Int Column
     -- Use sequence to pull the Gen out of the Map, then bind to obtain the
     -- resultant map from indexes to the (randomly generated) columns
     colMap <- sequence idxToGen
 
-    -- cols :: [[Maybe Value]]
     -- Extract the randomly generated columns from their constructor
     let cols = [c | col@(Column c) <- map snd (Map.toList colMap)]
-
-    -- All elements in the table, laid out in row-major format
-    -- elts :: [Maybe Value]
-    let elts = concat (transpose cols)
-
-    -- TODO: figure out how to associate table name with table
-    -- (add tablename to schema???)
-    -- TODO: look at allocateTable in LuStepper.hs
-
-    let table = listArray ((0, 0), (numRows - 1, numCols - 1)) elts
+        elts = concat (transpose cols)
+        table = listArray ((0, 0), (numRows - 1, numCols - 1)) elts
 
     -- Create the Table & use return to create a Generator of Tables
-    return $ listArray ((0, 0), (numRows - 1, numCols - 1)) elts
+    return $ listArray ((0, 0), (numRows - 1, numCols - 1)) elts    
 
 -- Generates a column of a fixed length containing
 -- Maybe values of a particular type (for 1/8th of the time, generate Nothing)
