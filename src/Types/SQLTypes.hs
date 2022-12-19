@@ -117,15 +117,6 @@ data CompOp
   | Le -- `<=`
   deriving (Eq, Show, Enum, Bounded)
 
--- Arithmetic (binary) operations
--- data ArithOp
---   = Plus -- `+`  :: Comparable -> Comparable -> Comparable
---   | Minus -- `-`  :: Comparable -> Comparable -> Comparable
---   | Times -- `*`  :: Comparable -> Comparable -> Comparable
---   | Divide -- `/` :: Comparable -> Comparable -> Comparable   -- floor division
---   | Modulo -- `%`  :: Comparable -> Comparable -> Comparable   -- modulo
---   deriving (Eq, Show, Enum, Bounded)
-
 -- Logical (binary) operations
 data LogicOp
   = And
