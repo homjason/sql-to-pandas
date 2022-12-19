@@ -1,13 +1,28 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+
 module Types.TableTypes where
 
 import Control.Monad
 import Data.Array
 import Data.Char
 import Data.Csv
+  ( DefaultOrdered (headerOrder),
+    FromField (parseField),
+    FromNamedRecord (parseNamedRecord),
+    Header,
+    ToField (toField),
+    ToNamedRecord (toNamedRecord),
+    (.:),
+    (.=),
+  )
+import Data.Csv qualified as Cassava
 import Data.Foldable (toList)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.String (IsString (..))
+import Data.Text (Text)
+import Data.Text.Encoding qualified as Text
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import Types.Types

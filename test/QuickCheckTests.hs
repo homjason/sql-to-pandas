@@ -14,9 +14,7 @@ import Parser (Parser)
 import Parser qualified as P
 import Print
 import SQLParser
-import State (State)
-import State qualified as S
-import Test.QuickCheck (Arbitrary (..), Gen)
+import Test.QuickCheck (Arbitrary (..), Gen, Property, (==>))
 import Test.QuickCheck qualified as QC
 import Test.QuickCheck qualified as Qc
 import Translator
@@ -34,6 +32,12 @@ sometimesGenNothing g =
       (7, Just <$> g)
     ]
 
+-- Generator for an individual column name (taken from a colname pool)
+genColName :: Gen ColName
+genColName = do
+  colNames <- genColNamePool
+  QC.elements colNames
+
 -- Generator for the pool of column names ("col0", "col1", etc.)
 genColNamePool :: Gen [ColName]
 genColNamePool = do
@@ -44,6 +48,49 @@ genColNamePool = do
 genTableName :: Gen TableName
 genTableName = QC.elements tableNames
 
+-------------------------------------------------------------------------------
+-- Generators for schema-independent sub-components of SQL queries
+
+instance Arbitrary ColExp where 
+  arbitrary :: Gen ColExp
+  arbitrary = genColExp
+  
+  shrink :: ColExp -> [ColExp]
+  shrink colExp = 
+    case colExp of 
+      Col colName -> []
+      Agg _ colName -> [Col colName]
+
+-- Generator for columns / aggregate functions in SELECT expressions
+genColExp :: Gen ColExp
+genColExp = QC.oneof [Col <$> genColName, genAgg]
+  where 
+    -- Generator for Aggregate Function Expressions in SELECT
+    genAgg :: Gen ColExp
+    genAgg = do
+      fn <- arbitrary
+      Agg fn <$> genColName
+
+
+instance Arbitrary SelectExp where
+  arbitrary :: Gen SelectExp
+  arbitrary = genSelectExp
+
+  shrink :: SelectExp -> [SelectExp]
+  shrink selectExp =
+    case selectExp of
+      Cols colExps -> map Cols (shrink colExps)
+      DistinctCols colExps -> map Cols (shrink colExps)
+      Star -> []
+
+genSelectExp :: Gen SelectExp
+genSelectExp =
+  QC.oneof
+    [ Cols <$> QC.resize 3 (QC.listOf1 genColExp),
+      DistinctCols <$> QC.resize 3 (QC.listOf1 genColExp),
+      return Star
+    ]
+    
 -- Generator for FROM expressions
 -- TODO: uncomment arbitrary for JoinExps!
 genFromExp :: Gen FromExp
@@ -92,12 +139,9 @@ genFromExp =
 --           (7, Just <$> genSmallInt)
 --         ]
 --     return $ Query select from wher groupBy orderBy limit
-
-genGroupBy :: Schema -> Gen [ColName]
-genGroupBy schema = QC.resize 2 (QC.listOf1 (genColName schema))
-
 -- | Generator for non-empty strings of length <= 5 that
 -- only contain letters a-d
+
 genSmallString :: Gen String
 genSmallString = QC.resize 5 (QC.listOf1 (QC.elements "abcd"))
 
@@ -191,17 +235,6 @@ genSchema = do
 
   -- Create schema
   return $ Map.fromList (zip colNames colTypes)
-
--- | Allocates a new table in the Store & computes a fresh name for the table
--- (Adapted from HW5)
-allocateTable :: Table -> State Store ()
-allocateTable table = do
-  store <- S.get
-  -- Make a fresh name for the new table
-  let n = length (Map.keys store)
-  let tableName = "t_" ++ show n
-  -- Update the store
-  S.put (Map.insert tableName table store)
 
 -- Generator that produces a non-empty Table adhering to an input Schema
 -- If an empty Schema is provided, this generator returns the special
@@ -338,121 +371,6 @@ accept (table, schema) (Query s f w gb ob l) =
       let (numRows, _) = dimensions table
        in n <= numRows
 
--- | Generator for queries that are accepted by a given (schema, table) pair
-genTableQuery :: (Schema, Table) -> Gen Query
-genTableQuery (schema, table) = do
-  let (numRows, _) = dimensions table
-  select <- genSelectExp schema
-  from <- genFromExp
-  wher <- sometimesGenNothing $ genWhereExp schema
-  groupBy <- sometimesGenNothing $ genGroupBy schema
-  orderBy <-
-    sometimesGenNothing $
-      liftM2 (,) (genColName schema) (arbitrary :: Gen Order)
-  limit <- sometimesGenNothing $ QC.chooseInt (1, numRows)
-  return $ Query select from wher groupBy orderBy limit
-
--- | Only generate column names in a particular schema
-genColName :: Schema -> Gen ColName
-genColName schema =
-  let colNames = Map.keys schema
-   in QC.elements colNames
-
--- | Generator for SELECT expressions based on a given schema
-genSelectExp :: Schema -> Gen SelectExp
-genSelectExp schema =
-  QC.oneof
-    [ Cols <$> QC.resize 3 (QC.listOf1 (genColExp schema)),
-      DistinctCols <$> QC.resize 3 (QC.listOf1 (genColExp schema)),
-      return Star
-    ]
-  where
-    -- Generator for columns / aggregate functions in SELECT expressions
-    genColExp :: Schema -> Gen ColExp
-    genColExp schema = QC.oneof [Col <$> genColName schema, genAgg schema]
-
-    -- Generator for Aggregate Function Expressions in SELECT
-    -- Looks up the type of each column in the schema to figure out
-    -- the appropriate aggregate function
-    -- Only Count, Min, Max allowed on string columns
-    -- (the latter 2 use lexicographic ordering)
-    genAgg :: Schema -> Gen ColExp
-    genAgg schema = do
-      colName <- genColName schema
-      let colType = Map.lookup colName schema
-      case colType of
-        Nothing -> return QC.discard
-        Just StringC -> do
-          fn <- QC.elements [Count, Min, Max]
-          Agg fn <$> genColName schema
-        Just _ -> do
-          fn <- arbitrary
-          Agg fn <$> genColName schema
-
--- | Generator for WHERE expressions based on a given schema
-genWhereExp :: Schema -> Gen WhereExp
-genWhereExp schema =
-  QC.oneof
-    [ liftM2 Op1 (CompVal <$> genColNameComparable) arbitrary,
-      genOp2,
-      -- liftM3 Op2 (aux (n - 1)) genBop (aux (n - 1)),
-      CompVal <$> genComparable
-    ]
-  where
-    -- Generator for Comparable values
-    genComparable :: Gen Comparable
-    genComparable =
-      QC.oneof
-        [ genColNameComparable,
-          genCompNum,
-          LitString <$> genSmallString
-        ]
-
-    genOp2 :: Gen WhereExp
-    genOp2 = do
-      bop <- genBop
-      case bop of
-        Arith _ ->
-          liftM3
-            Op2
-            (CompVal <$> genCompNum)
-            (return bop)
-            (CompVal <$> genCompNum)
-        Comp bop' ->
-          liftM3
-            Op2
-            (CompVal <$> genComparable)
-            (return bop)
-            (CompVal <$> genComparable)
-        Logic bop' -> liftM3 Op2 genCompOpExp (return bop) genCompOpExp
-
-    genCompOpExp :: Gen WhereExp
-    genCompOpExp = do
-      compOp <- (arbitrary :: Gen CompOp)
-      liftM3
-        Op2
-        (CompVal <$> genComparable)
-        (return (Comp compOp))
-        (CompVal <$> genComparable)
-
-    genColNameComparable :: Gen Comparable
-    genColNameComparable = ColName <$> genColName schema
-
-    genCompNum :: Gen Comparable
-    genCompNum =
-      QC.oneof
-        [ LitInt <$> genSmallInt,
-          LitDouble <$> genSmallDouble
-        ]
-
--- | Generator that generates a (schema, table, query) triple
-genSchemaTableQuery :: Gen (Schema, Table, Query)
-genSchemaTableQuery = do
-  schema <- genSchema
-  table <- genTable schema
-  query <- genTableQuery (schema, table)
-  return (schema, table, query)
-
 --------------------------------------------------------------------------------
 
 -- | Generate a small set of names for generated tests. These names are guaranteed to not include
@@ -470,14 +388,6 @@ genSchemaTableQuery = do
 
 -- prop_table_len :: Query -> Bool
 -- prop_table_len q = length (pretty (getSQLTable q)) == length (pretty (getPandasTable (translateSQL q)))
-
--- Check if fields corresponding to irrelevant components of a Query
--- are set to Nothing after parsing
--- QUESTION FOR JOE: clarify how generics works???
--- Reference:
--- https://stackoverflow.com/questions/62580560/how-to-check-if-all-of-the-maybe-fields-in-a-haskell-record-are-nothing
--- fieldsAreNothing :: (Data d) => d -> Bool
--- fieldsAreNothing = and . gmapQ (const True `ext1Q` isNothing)
 
 -- irrelevantFieldsAreNothing :: (Data d) => d -> Maybe d
 -- irrelevantFieldsAreNothing x =
@@ -502,11 +412,27 @@ quickCheckN :: QC.Testable prop => Int -> prop -> IO ()
 quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 100}
 
 --------------------------------------------------------------------------------
+-- Round trip properties
 prop_roundtrip_query :: Query -> Bool
 prop_roundtrip_query q = P.parse queryP (pretty q) == Right q
 
-prop_roundtrip_select :: SelectExp -> Bool
-prop_roundtrip_select s = P.parse selectExpP (pretty s) == Right s
+prop_roundtrip_select :: SelectExp -> Property
+prop_roundtrip_select s = 
+  case s of 
+    Star -> QC.property (P.parse selectExpP (pretty s) == Right s)
+    Cols colExps -> not (null colExps) ==> P.parse selectExpP (pretty s) == Right s
+    DistinctCols colExps -> not (null colExps) ==> P.parse selectExpP (pretty s) == Right s
+    
+
+-- >>> pretty (Cols [Col "col1"])
+-- "SELECT col1\n"
+
+-- >>> P.parse selectExpP $ pretty (Cols [Col "col1"])
+-- Left "No parses"
+
+-- >>> P.parse selectExpP "select col1\n"
+-- Right (Cols [Col "col1"])
+
 
 -- prop_roundtrip_from :: FromExp -> Bool
 -- prop_roundtrip_from f = P.parse fromExpP (pretty f) == Right f
@@ -514,8 +440,27 @@ prop_roundtrip_select s = P.parse selectExpP (pretty s) == Right s
 prop_roundtrip_where :: WhereExp -> Bool
 prop_roundtrip_where w = P.parse whereExpP (pretty w) == Right w
 
------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Other properties
 
+-- | Check that Schemas only contain unique columns (no duplicate columns)
+prop_schema_uniqueCols :: Schema -> Bool
+prop_schema_uniqueCols schema =
+  let colNames = (Set.fromList . Map.keys) schema
+   in Set.size colNames == Map.size schema
+
+-- Check that the getColIdxs function is injective
+-- (i.e. distinct columns map to distinct column indexes)
+prop_getColIdxs_injective :: Schema -> Bool
+prop_getColIdxs_injective schema = undefined "TODO"
+
+-- >>> elems (array ((0,0),(3,0)) [((0,0),Just (StringVal "b")),((1,0),Just (StringVal "acabc")),((2,0),Just (StringVal "bbdb")),((3,0),Just (StringVal "c"))])
+-- [Just (StringVal "b"),Just (StringVal "acabc"),Just (StringVal "bbdb"),Just (StringVal "c")]
+
+-- >>> assocs (array ((0,0),(3,0)) [((0,0),Just (StringVal "b")),((1,0),Just (StringVal "acabc")),((2,0),Just (StringVal "bbdb")),((3,0),Just (StringVal "c"))])
+-- [((0,0),Just (StringVal "b")),((1,0),Just (StringVal "acabc")),((2,0),Just (StringVal "bbdb")),((3,0),Just (StringVal "c"))]
+
+--------------------------------------------------------------------------------
 -- qc :: IO ()
 -- qc = do
 --   putStrLn "roundtrip_query"

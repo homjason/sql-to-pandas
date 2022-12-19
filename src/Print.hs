@@ -183,12 +183,12 @@ listToDoc cExps = case cExps of
 
 instance PP SelectExp where
   -- pp (Cols cExps) = PP.text $ "SELECT " <> show (map pp cExps)
-  pp (Cols cExps) = PP.text $ "SELECT " <> tail (init (show (map pp cExps))) <> "\n"
+  pp (Cols cExps) = PP.text $ "select " <> tail (init (show (map pp cExps))) <> "\n"
   -- pp (Cols cExps) = PP.text $ "SELECT " <> foldr (\x acc -> acc ++ pp x ++ PP.text ", ") PP.empty cExps
   -- pp (Cols cExps) = PP.text "SELECT " <> listToDoc cExps
   -- pp (Cols cExps) = PP.text "SELECT " <> intercalate ", " ((map (show . pp) cExps))
-  pp (DistinctCols cExps) = PP.text $ "SELECT DISTINCT " <> tail (init (show (map pp cExps))) <> "\n"
-  pp Star = PP.text "SELECT *\n"
+  pp (DistinctCols cExps) = PP.text $ "select distinct " <> tail (init (show (map pp cExps))) <> "\n"
+  pp Star = PP.text "select *\n"
 
 instance PP ColExp where
   pp (Col cName) = PP.text cName
@@ -214,9 +214,9 @@ mapJoinStyleToSQLSyntax js = case js of
   InnerJoin -> " join "
 
 instance PP FromExp where
-  pp (Table n) = PP.text $ "FROM " <> n <> " "
+  pp (Table n) = PP.text $ "from " <> n <> " "
   pp (TableJoin (Join lTable lCol rTable rCol st)) =
-    PP.text $ "FROM " <> lTable <> mapJoinStyleToSQLSyntax st <> rTable <> " ON " <> lTable <> "." <> lCol <> " = " <> rTable <> "." <> rCol
+    PP.text $ "from " <> lTable <> mapJoinStyleToSQLSyntax st <> rTable <> " on " <> lTable <> "." <> lCol <> " = " <> rTable <> "." <> rCol
 
 instance PP WhereExp where
   pp (Op2 we1 bop we2) = pp we1 <> PP.char ' ' <> pp bop <> PP.char ' ' <> pp we2
@@ -230,8 +230,8 @@ instance PP SQL.Comparable where
   pp (LitDouble d) = PP.double d
 
 instance PP SQL.Uop where
-  pp IsNull = PP.text "IS NULL"
-  pp IsNotNull = PP.text "IS NOT NULL"
+  pp IsNull = PP.text "is null"
+  pp IsNotNull = PP.text "is not null"
 
 instance PP SQL.Bop where
   pp (Comp op) = pp op
@@ -254,8 +254,8 @@ instance PP ArithOp where
   pp Modulo = PP.text "%"
 
 instance PP SQL.LogicOp where
-  pp And = PP.text "AND"
-  pp Or = PP.text "OR"
+  pp And = PP.text "and"
+  pp Or = PP.text "or"
 
 -- >>> pp (Op2 (CompVal (ColName "c1")) (Comp Gt) (CompVal (LitInt 5)))
 -- c1 > 5
