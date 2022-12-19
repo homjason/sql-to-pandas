@@ -6,16 +6,6 @@ module Types.TableTypes where
 import Control.Monad
 import Data.Array
 import Data.Char
-import Data.Csv
-  ( DefaultOrdered (headerOrder),
-    FromField (parseField),
-    FromNamedRecord (parseNamedRecord),
-    Header,
-    ToField (toField),
-    ToNamedRecord (toNamedRecord),
-    (.:),
-    (.=),
-  )
 import Data.Csv qualified as Cassava
 import Data.Foldable (toList)
 import Data.Map.Strict (Map)
@@ -41,32 +31,6 @@ data Value
   = IntVal Int -- 1
   | StringVal String -- "abd"
   deriving (Eq, Show, Ord)
-  
--- | DoubleVal Double -- 64-bit
-  
-
--- Initial table name
-initTableName :: TableName
-initTableName = "_G"
-
--- Initial table schema
-initSchema :: Schema
-initSchema = Map.fromList [("col0", StringC), ("col1", StringC)]
-
--- Initial table
-initTable :: Table
-initTable =
-  array
-    ((0, 0), (1, 1))
-    [ ((0, 0), Just (StringVal "(0, 0)")),
-      ((0, 1), Just (StringVal "(0, 1)")),
-      ((1, 0), Just (StringVal "(1, 0)")),
-      ((1, 1), Just (StringVal "(1, 1)"))
-    ]
-
--- Initial store maps the initTable's name to the initial table
-initialStore :: Store
-initialStore = Map.singleton initTableName initTable
 
 -- Each schema is a map from ColName to a ColType
 -- (Schemas are internally ordered by lexicographic order of the colname
@@ -144,12 +108,3 @@ mkSchema = Map.fromList
 -- | Inverts the keys & values of a (one-to-one) Map
 invertMap :: Ord v => Map k v -> Map v k
 invertMap = Map.fromList . map (\(k, v) -> (v, k)) . Map.toList
-
----------------------------------------------------------------------------------
--- Take a schema and returns a Map from each column name to its column index
--- POTENTIAL QC PROPERTY: check that this function is injective (?)
--- i.e. unique colnames map to unique (non-negative) indexes
--- getColNameIndex :: Schema -> Map ColName ColIndex
--- getColNameIndex schema =
---   let colnames = map fst schema
---    in undefined

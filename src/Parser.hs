@@ -145,11 +145,6 @@ type ParseError = String
 class Monad m => MonadError e m where
   throwError :: e -> m a
 
--- Make Either ParseError an instance of the MoandError typeclass
--- instance MonadError ParseError (Either ParseError) where
---   throwError :: ParseError -> Either ParseError a
---   throwError = Left
-
 -- | Use a parser for a particular string. Note that this parser
 -- combinator library doesn't support descriptive parse errors, but we
 -- give it a type similar to other Parsing libraries.
