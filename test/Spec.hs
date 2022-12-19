@@ -6,6 +6,9 @@ import UnitTests
 
 main :: IO ()
 main = do
+  putStrLn "RUN SQL Parser Tests"
+  test_sql_parser
+  putStrLn "----------------------------"
   putStrLn "RUN TRANSLATOR TESTS"
   test_translator
   putStrLn "----------------------------"

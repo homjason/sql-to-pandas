@@ -38,8 +38,8 @@ oneLine = PP.renderStyle (PP.style {PP.mode = PP.OneLineMode}) . pp
 convertOrdToBool :: Order -> Bool
 convertOrdToBool o = o == Asc
 
-lowerAggName :: String -> String
-lowerAggName f = case f of
+lowerName :: String -> String
+lowerName f = case f of
   [] -> []
   hd : tl -> Char.toLower hd : tl
 
@@ -81,7 +81,7 @@ instance PP Pandas.Func where
   pp (Pandas.SortValues cName o) = PP.text $ ".sort_values(by=[" ++ show cName ++ "], ascending=" ++ show (convertOrdToBool o) ++ ")"
   pp (Pandas.Rename colNameMap) = undefined
   pp (Pandas.Group colNames) = PP.text $ ".groupBy(by=" ++ show colNames ++ ")"
-  pp (Pandas.Aggregate fn col) = PP.text $ ".agg({" ++ show col ++ ":" ++ show (lowerAggName (show fn)) ++ "})"
+  pp (Pandas.Aggregate fn col) = PP.text $ ".agg({" ++ show col ++ ":" ++ show (lowerName (show fn)) ++ "})"
   pp (Pandas.Loc boolExp) = PP.text ".loc[" <> pp boolExp <> PP.text "]"
   pp (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = PP.text $ ".merge(" ++ rightDf ++ ", left_on=" ++ show leftOn ++ ", right_on=" ++ show rightOn ++ ", how=" ++ show (mapJoinStyleToPandasSyntax how) ++ ")"
   pp (Pandas.Unique colNames) = PP.text $ ".drop_duplicates(subset=" ++ show colNames ++ ")"
@@ -161,20 +161,20 @@ instance PP Query where
   pp (Query s f w gb ob l) = case (w, gb, ob, l) of
     (Nothing, Nothing, Nothing, Nothing) -> pp s <> PP.char ' ' <> pp f
     (Just wher, Nothing, Nothing, Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher
-    (Nothing, Just g, Nothing, Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " group by " <> PP.text (show g)
-    (Nothing, Nothing, Just o@(cName, or), Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or)
+    (Nothing, Just g, Nothing, Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " group by " <> PP.text (intercalate "," g)
+    (Nothing, Nothing, Just o@(cName, or), Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " order by " <> PP.text cName <> PP.text " " <> PP.text (lowerName $ show or)
     (Nothing, Nothing, Nothing, Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " limit " <> PP.text (show x)
     (Just wher, Just g, Nothing, Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher <> PP.text " group by " <> PP.text (show g)
-    (Nothing, Just g, Just o@(cName, or), Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or)
-    (Nothing, Nothing, Just o@(cName, or), Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or) <> PP.text " limit " <> PP.text (show x)
+    (Nothing, Just g, Just o@(cName, or), Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text cName <> PP.text " " <> PP.text (lowerName $ show or)
+    (Nothing, Nothing, Just o@(cName, or), Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " order by " <> PP.text cName <> PP.text " " <> PP.text (lowerName $ show or) <> PP.text " limit " <> PP.text (show x)
     (Nothing, Just g, Nothing, Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " group by " <> PP.text (show g) <> PP.text " limit " <> PP.text (show x)
-    (Nothing, Just g, Just o@(cName, or), Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or) <> PP.text " limit " <> PP.text (show x)
+    (Nothing, Just g, Just o@(cName, or), Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text cName <> PP.text " " <> PP.text (lowerName $ show or) <> PP.text " limit " <> PP.text (show x)
     (Just wher, Nothing, Nothing, Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher <> PP.text " limit " <> PP.text (show x)
-    (Just wher, Nothing, Just o@(cName, or), Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text "w here " <> pp wher <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or)
-    (Just wher, Nothing, Just o@(cName, or), Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or) <> PP.text " limit " <> PP.text (show x)
+    (Just wher, Nothing, Just o@(cName, or), Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text "w here " <> pp wher <> PP.text " order by " <> PP.text cName <> PP.text " " <> PP.text (lowerName $ show or)
+    (Just wher, Nothing, Just o@(cName, or), Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher <> PP.text " order by " <> PP.text cName <> PP.text " " <> PP.text (lowerName $ show or) <> PP.text " limit " <> PP.text (show x)
     (Just wher, Just g, Nothing, Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher <> PP.text " group by " <> PP.text (show g) <> PP.text " limit " <> PP.text (show x)
-    (Just wher, Just g, Just o@(cName, or), Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or)
-    (Just wher, Just g, Just o@(cName, or), Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or) <> PP.text " limit " <> PP.text (show x)
+    (Just wher, Just g, Just o@(cName, or), Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text cName <> PP.text " " <> PP.text (lowerName $ show or)
+    (Just wher, Just g, Just o@(cName, or), Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text cName <> PP.text " " <> PP.text (lowerName $ show or) <> PP.text " limit " <> PP.text (show x)
 
 listToDoc :: [ColExp] -> Doc
 listToDoc cExps = case cExps of
@@ -192,7 +192,7 @@ instance PP SelectExp where
 
 instance PP ColExp where
   pp (Col cName) = PP.text cName
-  pp (Agg fn cName) = PP.text $ lowerAggName (show fn) <> "(" <> cName <> ")"
+  pp (Agg fn cName) = PP.text $ lowerName (show fn) <> "(" <> cName <> ")"
 
 -- colExpToString :: ColExp -> String
 --   colExpToString (Col cName) = cName

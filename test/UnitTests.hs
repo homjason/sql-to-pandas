@@ -1188,7 +1188,51 @@ test_printSQLQuery =
                 limit = Nothing
               }
           )
-          ~?= PP.text "select col from table"
+          ~?= PP.text "select col from table",
+        pp
+          ( Query
+              { select = Cols [Col "col", Col "col2"],
+                from = Table "table",
+                wher = Just $ SQL.Op2 (SQL.CompVal $ SQL.ColName "col") (SQL.Comp SQL.Gt) (SQL.CompVal $ SQL.LitInt 4),
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= PP.text "select col,col2 from table where col > 4",
+        pp
+          ( Query
+              { select = Cols [Col "col1", Agg Count "col2"],
+                from = Table "table",
+                wher = Nothing,
+                groupBy = Just ["col1"],
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= PP.text "select col1,count(col2) from table group by col1",
+        pp
+          ( Query
+              { select = Cols [Col "col1", Col "col2", Agg Count "col3"],
+                from = Table "table",
+                wher = Nothing,
+                groupBy = Just ["col1", "col2"],
+                orderBy = Nothing,
+                limit = Nothing
+              }
+          )
+          ~?= PP.text "select col1,col2,count(col3) from table group by col1,col2",
+        pp
+          ( Query
+              { select = Cols [Col "col"],
+                from = Table "table",
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Just ("col", Asc),
+                limit = Nothing
+              }
+          )
+          ~?= PP.text "select col from table order by col asc"
       ]
 
 --------------------------------------------------------------------------------
