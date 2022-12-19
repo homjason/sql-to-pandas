@@ -94,7 +94,7 @@ instance PP Pandas.BoolExp where
   pp (Pandas.CompVal c) = pp c
 
 instance PP Pandas.Comparable where
-  pp (Pandas.ColName cn) = PP.text $ "df[" <> show cn <> "]"
+  pp (Pandas.ColName cn df) = PP.text $ df <> "[" <> show cn <> "]"
   pp (Pandas.LitInt i) = PP.int i
   pp (Pandas.LitString s) = PP.text $ show s
   pp (Pandas.LitDouble d) = PP.double d

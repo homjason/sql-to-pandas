@@ -1,9 +1,18 @@
+import Lib
+import QuickCheckTests
 import Test.HUnit
 import Test.QuickCheck
-
-import Lib
+import UnitTests
 
 main :: IO ()
-main = do 
-    putStrLn someFunc
-    putStrLn "Test suite not yet implemented"
+main = do
+  putStrLn "RUN TRANSLATOR TESTS"
+  test_translator
+  putStrLn "----------------------------"
+  putStrLn "RUN PRINT TESTS"
+  test_print
+  putStrLn "----------------------------"
+  putStrLn "RUN TABLE TESTS"
+  test_table
+  putStrLn "----------------------------"
+  return ()

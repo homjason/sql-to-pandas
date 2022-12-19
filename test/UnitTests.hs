@@ -8,7 +8,7 @@ import Parser qualified as P
 -- import Print
 import Print (PP (pp))
 import SQLParser
-import Test.HUnit (Counts, Test (..), runTestTT, (~:), (~?=))
+import Test.HUnit (Counts, Test (..), runTestTT, runTestTTAndExit, (~:), (~?=))
 import Test.QuickCheck qualified as QC
 import Text.PrettyPrint qualified as PP
 import Translator
@@ -877,9 +877,9 @@ test_whereExpToLoc :: Test
 test_whereExpToLoc =
   "translating SQL WHERE to Pandas Loc"
     ~: TestList
-      [ whereExpToLoc (Just $ SQL.Op2 (SQL.CompVal (SQL.ColName "col")) (SQL.Comp SQL.Eq) (SQL.CompVal (SQL.LitString "hello")))
-          ~?= [Loc (Pandas.Op2 (Pandas.CompVal (Pandas.ColName "col")) (Pandas.Comp Pandas.Eq) (Pandas.CompVal (Pandas.LitString "hello")))],
-        whereExpToLoc Nothing ~?= []
+      [ whereExpToLoc (Just $ SQL.Op2 (SQL.CompVal (SQL.ColName "col")) (SQL.Comp SQL.Eq) (SQL.CompVal (SQL.LitString "hello"))) "table"
+          ~?= [Loc (Pandas.Op2 (Pandas.CompVal (Pandas.ColName "col" "table")) (Pandas.Comp Pandas.Eq) (Pandas.CompVal (Pandas.LitString "hello")))],
+        whereExpToLoc Nothing "table" ~?= []
       ]
 
 test_limitExpToHead :: Test
@@ -983,7 +983,7 @@ test_translateSQL =
           ~?= Command
             { df = "table",
               cols = Just ["col", "col2"],
-              fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col") (Pandas.Comp Pandas.Gt) (Pandas.CompVal $ Pandas.LitInt 4)]
+              fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col" "table") (Pandas.Comp Pandas.Gt) (Pandas.CompVal $ Pandas.LitInt 4)]
             },
         translateSQL
           ( Query
@@ -1025,6 +1025,7 @@ test_getFuncs =
                 limit = Nothing
               }
           )
+          "table"
           ~?= Nothing
       ]
 
@@ -1055,7 +1056,16 @@ test_printPandasCommands =
                     ]
               }
           )
-          ~?= PP.text "table1[\"col1\",\"col2\"].merge(table2, left_on=\"col1\", right_on=\"col1\", how=\"inner\")"
+          ~?= PP.text
+            "table1[\"col1\",\"col2\"].merge(table2, left_on=\"col1\", right_on=\"col1\", how=\"inner\")",
+        pp
+          ( Command
+              { df = "table",
+                cols = Just ["col", "col2"],
+                fn = Just [Loc $ Pandas.Op2 (Pandas.CompVal $ Pandas.ColName "col" "table") (Pandas.Comp Pandas.Gt) (Pandas.CompVal $ Pandas.LitInt 4)]
+              }
+          )
+          ~?= PP.text "table[\"col\",\"col2\"].loc[table[\"col\"] > 4]"
       ]
 
 --------------------------------------------------------------------------------
@@ -1252,7 +1262,20 @@ test_validate_query =
         test_noDistinctAndGroupBy
       ]
 
-test_translator :: IO Counts
+-- test_translator =
+--   runTestTT $
+--     TestList
+--       [ test_selectExpToCols,
+--         test_translateJoinExp,
+--         test_translateFromExp,
+--         test_whereExpToLoc,
+--         test_limitExpToHead,
+--         test_orderByToSortValues,
+--         test_groupByToPandasGroupBy,
+--         test_translateSQL,
+--         test_getFuncs
+--       ]
+
 test_translator =
   runTestTT $
     TestList

@@ -21,7 +21,7 @@ translateSQL :: Query -> Command
 translateSQL q@(Query s f w gb ob l) =
   let cols = getColsFromSelectTranslation (selectExpToCols s)
    in let dfName = getTableName $ translateFromExp f
-       in let fns = getFuncs q
+       in let fns = getFuncs q dfName
            in Command
                 { df = dfName,
                   cols = Just cols,
@@ -40,9 +40,9 @@ moveResetIndex fns =
 -- [GroupBy ["col1"],Aggregate Count "col2",ResetIndex]
 
 -- | Given a SQL query, extracts a list of (equivalent) Pandas functions
-getFuncs :: Query -> Maybe [Func]
-getFuncs q@(Query s f w gb ob l) =
-  let funcList = getJoinFunc (translateFromExp f) ++ whereExpToLoc w ++ groupByToPandasGroupBy gb ++ getFnsFromSelectTranslation (selectExpToCols s) ++ orderByToSortValues ob ++ limitExpToHead l
+getFuncs :: Query -> TableName -> Maybe [Func]
+getFuncs q@(Query s f w gb ob l) df =
+  let funcList = getJoinFunc (translateFromExp f) ++ whereExpToLoc w df ++ groupByToPandasGroupBy gb ++ getFnsFromSelectTranslation (selectExpToCols s) ++ orderByToSortValues ob ++ limitExpToHead l
    in case funcList of
         [] -> Nothing
         hd : tl -> Just $ moveResetIndex funcList
@@ -139,24 +139,24 @@ sqlToPandasBop bop = case bop of
     SQL.And -> Pandas.Logic Pandas.And
     SQL.Or -> Pandas.Logic Pandas.Or
 
-sqlToPandasCompVal :: SQL.Comparable -> Pandas.Comparable
-sqlToPandasCompVal comp = case comp of
-  SQL.ColName s -> Pandas.ColName s
+sqlToPandasCompVal :: SQL.Comparable -> TableName -> Pandas.Comparable
+sqlToPandasCompVal comp df = case comp of
+  SQL.ColName s -> Pandas.ColName s df
   SQL.LitInt n -> Pandas.LitInt n
   SQL.LitString s -> Pandas.LitString s
   SQL.LitDouble x -> Pandas.LitDouble x
 
-whereExpToBoolExp :: WhereExp -> BoolExp
-whereExpToBoolExp we = case we of
-  SQL.Op1 we' uop -> Pandas.Op1 (whereExpToBoolExp we') (sqlToPandasUop uop)
-  SQL.Op2 we1 bop we2 -> Pandas.Op2 (whereExpToBoolExp we1) (sqlToPandasBop bop) (whereExpToBoolExp we2)
-  SQL.CompVal com -> Pandas.CompVal (sqlToPandasCompVal com)
+whereExpToBoolExp :: WhereExp -> TableName -> BoolExp
+whereExpToBoolExp we df = case we of
+  SQL.Op1 we' uop -> Pandas.Op1 (whereExpToBoolExp we' df) (sqlToPandasUop uop)
+  SQL.Op2 we1 bop we2 -> Pandas.Op2 (whereExpToBoolExp we1 df) (sqlToPandasBop bop) (whereExpToBoolExp we2 df)
+  SQL.CompVal com -> Pandas.CompVal (sqlToPandasCompVal com df)
 
 -- | Converts "WHERE" expressions in SQL to "loc" function in Pandas
-whereExpToLoc :: Maybe WhereExp -> [Func]
-whereExpToLoc wExp = case wExp of
+whereExpToLoc :: Maybe WhereExp -> TableName -> [Func]
+whereExpToLoc wExp df = case wExp of
   Nothing -> []
-  Just we -> [Loc (whereExpToBoolExp we)]
+  Just we -> [Loc (whereExpToBoolExp we df)]
 
 -- | Converts "LIMIT" clauses in SQL to "head" function in Pandas
 limitExpToHead :: Maybe Int -> [Func]

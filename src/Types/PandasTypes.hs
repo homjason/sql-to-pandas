@@ -71,7 +71,7 @@ data BoolExp
 
 -- Values that can be compared in SQL queries (either columns or literal values)
 data Comparable
-  = ColName ColName -- column name
+  = ColName ColName TableName -- column name
   | LitInt Int -- literal ints (positive / negative)
   | LitString String -- literal strings
   | LitDouble Double -- literal doubles
