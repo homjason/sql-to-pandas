@@ -409,16 +409,6 @@ noDistinctAndGroupBy select@(DistinctCols _) groupBy@(Just _) =
 noDistinctAndGroupBy _ (Just _) = Right True
 noDistinctAndGroupBy _ Nothing = Right True
 
--- Parses the string into a query and translates it into a Pandas Command
-runParseAndTranslate :: String -> Either P.ParseError Command
-runParseAndTranslate s = case parseQuery s of
-  Left str -> Left str
-  Right q ->
-    case validateQuery q of
-      Left validateError -> Left validateError
-      Right False -> Left "Invalid SQL query"
-      Right True -> Right $ translateSQL q
-
 -------------------------------------------------------------------------------
 -- Convenience functions for constructing Query records
 

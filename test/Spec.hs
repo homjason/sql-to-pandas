@@ -18,4 +18,7 @@ main = do
   putStrLn "RUN TABLE TESTS"
   test_table
   putStrLn "----------------------------"
+  putStrLn "RUN OVERALL TESTS"
+  test_pipeline
+  putStrLn "----------------------------"
   return ()

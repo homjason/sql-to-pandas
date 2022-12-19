@@ -3,9 +3,11 @@ module UnitTests where
 import Data.Array (Array, array)
 import Data.Set (Set)
 import Data.Set qualified as Set
+-- import Print
+
+import Lib (runSqlToPandas)
 import Parser
 import Parser qualified as P
--- import Print
 import Print (PP (pp))
 import SQLParser
 import Test.HUnit (Counts, Test (..), runTestTT, runTestTTAndExit, (~:), (~?=))
@@ -1032,7 +1034,7 @@ test_printPandasCommands =
     ~: TestList
       [ pp (Command "table" (Just ["col"]) Nothing) ~?= PP.text "table[\"col\"]",
         pp (Command "table" (Just ["col"]) (Just [Head 5])) ~?= PP.text "table[\"col\"].head(5)",
-        pp (Pandas.Command "table" (Just ["col1", "col2"]) (Just [Group ["col1"], Pandas.Aggregate Count "col2", Pandas.ResetIndex])) ~?= PP.text "table[\"col1\",\"col2\"].groupBy(by=[\"col1\"]).agg({\"col2\":\"count\"}).reset_index()",
+        pp (Pandas.Command "table" (Just ["col1", "col2"]) (Just [Group ["col1"], Pandas.Aggregate Count "col2", Pandas.ResetIndex])) ~?= PP.text "table[\"col1\",\"col2\"].groupby(by=[\"col1\"]).agg({\"col2\":\"count\"}).reset_index()",
         pp (Pandas.Command "table" (Just ["col"]) (Just [Pandas.SortValues "col" Asc])) ~?= PP.text "table[\"col\"].sort_values(by=[\"col\"], ascending=True)",
         pp
           ( Command
@@ -1250,6 +1252,21 @@ test_printSQLQuery =
           )
           ~?= PP.text "select col,count(col2) from table where col is not null group by col order by col asc limit 10"
       ]
+
+--------------------------------------------------------------------------------
+-- PIPELINE unit tests
+-- Parse -> Translate -> Print
+test_runParseTranslatePrint :: Test
+test_runParseTranslatePrint =
+  "Running the entire pipeline: given sql query string, print pandas command"
+    ~: TestList
+      [ runSqlToPandas "select Artist, count(Position) from rankings_df where position=1 group by Artist order by artist desc limit 10"
+          ~?= "rankings_df[\"artist\",\"position\"].loc[rankings_df[\"position\"] == 1].groupby(by=[\"artist\"]).agg({\"position\":\"count\"}).sort_values(by=[\"artist\"], ascending=False).head(10).reset_index()"
+          -- "rankings_df[rankings_df[\"count(Position)\']==1].groupby([\'Artist\']).count().sort_values(by=\'count(Position)\',ascending=False).head(10).reset_index()[['Artist','Position']]"
+      ]
+
+-- >>> parseQuery "select Artist, count(Position) from rankings_df where position=1 group by Artist order by artist desc limit 10"
+-- Right (Query {select = Cols [Col "artist",Agg Count "position"], from = Table "rankings_df", wher = Just (Op2 (CompVal (ColName "position")) (Comp Eq) (CompVal (LitInt 1))), groupBy = Just ["artist"], orderBy = Just ("artist",Desc), limit = Just 10})
 
 --------------------------------------------------------------------------------
 -- TABLE unit tests
@@ -1475,6 +1492,9 @@ test_translator =
 
 test_print :: IO Counts
 test_print = runTestTT $ TestList [test_printPandasCommands, test_printSQLQuery]
+
+test_pipeline :: IO Counts
+test_pipeline = runTestTT test_runParseTranslatePrint
 
 test_table :: IO Counts
 test_table = runTestTT $ TestList [test_dimensions, test_tableToList]

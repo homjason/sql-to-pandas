@@ -80,7 +80,7 @@ mapJoinStyleToPandasSyntax js = case js of
 instance PP Pandas.Func where
   pp (Pandas.SortValues cName o) = PP.text $ ".sort_values(by=[" ++ show cName ++ "], ascending=" ++ show (convertOrdToBool o) ++ ")"
   pp (Pandas.Rename colNameMap) = undefined
-  pp (Pandas.Group colNames) = PP.text $ ".groupBy(by=" ++ show colNames ++ ")"
+  pp (Pandas.Group colNames) = PP.text $ ".groupby(by=" ++ show colNames ++ ")"
   pp (Pandas.Aggregate fn col) = PP.text $ ".agg({" ++ show col ++ ":" ++ show (lowerName (show fn)) ++ "})"
   pp (Pandas.Loc boolExp) = PP.text ".loc[" <> pp boolExp <> PP.text "]"
   pp (Pandas.Merge mergeExp@(Pandas.MkMerge rightDf leftOn rightOn how)) = PP.text $ ".merge(" ++ rightDf ++ ", left_on=" ++ show leftOn ++ ", right_on=" ++ show rightOn ++ ", how=" ++ show (mapJoinStyleToPandasSyntax how) ++ ")"
