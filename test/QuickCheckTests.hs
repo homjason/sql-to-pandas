@@ -130,6 +130,15 @@ genWhereExp =
             (CompVal <$> genComparable)
         Logic bop' -> liftM3 Op2 genCompOpExp (return bop) genCompOpExp
 
+    -- Generator for Bops uses Arbitrary instance for binary operations
+    genBop :: Gen Bop
+    genBop =
+      QC.oneof
+        [ Comp <$> arbitrary,
+          Arith <$> arbitrary,
+          Logic <$> arbitrary
+        ]
+
     genCompOpExp :: Gen WhereExp
     genCompOpExp = do
       compOp <- (arbitrary :: Gen CompOp)
@@ -236,15 +245,6 @@ genGroupBy = QC.resize 2 (QC.listOf1 genColName)
 
 ----------------------------------------------------
 -- Arbitrary instances for Enum types
-
--- Generator for Bops uses the Arbitrary instance for various binary operations
-genBop :: Gen Bop
-genBop =
-  QC.oneof
-    [ Comp <$> arbitrary,
-      Arith <$> arbitrary,
-      Logic <$> arbitrary
-    ]
 
 -- Generators for Enum types (unary & binary operators)
 -- just use QC.arbitraryBoundedEnum
@@ -498,6 +498,17 @@ quickCheckN n = QC.quickCheckWith $ QC.stdArgs {QC.maxSuccess = n, QC.maxSize = 
 prop_roundtrip_query :: Query -> Bool
 prop_roundtrip_query q = P.parse queryP (pretty q) == Right q
 
+q = Query {select = DistinctCols [Agg Max "col2", Col "col2"], from = Table "F", wher = Just (CompVal (LitString "ba")), Types.SQLTypes.groupBy = Just ["col0"], orderBy = Nothing, limit = Nothing}
+
+-- >>> pretty q
+-- "select distinct max(col2),col2 from F where \"ba\" group by [\"col0\"]"
+
+-- >>> P.parse queryP "select distinct max(col2),col2 from F group by col2"
+-- Left "Parsing results don't satisfy predicate"
+
+-- >>> P.parse queryP "select col from a"
+-- Right (Query {select = Cols [Col "col"], from = Table "a", wher = Nothing, groupBy = Nothing, orderBy = Nothing, limit = Nothing})
+
 prop_roundtrip_select :: SelectExp -> Property
 prop_roundtrip_select s =
   case s of
@@ -511,7 +522,7 @@ prop_roundtrip_from :: FromExp -> Bool
 prop_roundtrip_from f = P.parse fromExpP (pretty f) == Right f
 
 prop_roundtrip_where :: WhereExp -> Bool
-prop_roundtrip_where w = P.parse whereExpP (pretty w) == Right w
+prop_roundtrip_where w = P.parse whereExpP ("where " <> pretty w) == Right w
 
 --------------------------------------------------------------------------------
 -- Other properties
