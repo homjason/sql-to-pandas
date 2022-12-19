@@ -162,7 +162,6 @@ shrinkWhereExp w =
     Op2 w1 bop w2 -> shrink w1 ++ shrink w2
     CompVal (ColName _) -> []
     CompVal (LitInt n) -> map (CompVal . LitInt) (shrink n)
-    -- CompVal (LitDouble double) -> map (CompVal . LitDouble) (shrink double)
     CompVal (LitString str) -> map (CompVal . LitString) (shrink str)
 
 genComparable :: Gen Comparable
@@ -171,7 +170,6 @@ genComparable =
     [ ColName <$> genColName,
       LitInt <$> genSmallInt,
       LitString <$> genSmallString
-      -- LitDouble <$> genSmallDouble
     ]
 
 instance Arbitrary FromExp where
@@ -289,21 +287,6 @@ instance Arbitrary ColType where
   arbitrary = genColType
   shrink c = [IntC]
 
--- | Arbitrary instance for Table Schemas
--- instance Arbitrary Schema where
---   arbitrary :: Gen Schema
---   arbitrary = genSchema
-
---   shrink :: Schema -> [Schema]
---   shrink schema = shrinkSchema schema
-
--- | Shrinker for schemas
--- shrinkSchema :: Schema -> [Schema]
--- shrinkSchema schema = do
---   (colName, colType) <- Map.toList schema
---   shrunkType <- shrink colType
---   return $ Map.singleton colName shrunkType
-
 -- | Generator for schemas
 genSchema :: Gen Schema
 genSchema = do
@@ -376,8 +359,6 @@ genCol colLen colType =
     IntC -> Column <$> genIntCol colLen
     StringC -> Column <$> genStringCol colLen
   where
-    -- DoubleC -> Column <$> genDoubleCol colLen
-
     genIntCol :: Int -> Gen [Maybe Value]
     genIntCol colLen =
       QC.vectorOf colLen $ sometimesGenNothing (IntVal <$> genSmallInt)
@@ -386,16 +367,10 @@ genCol colLen colType =
     genStringCol colLen =
       QC.vectorOf colLen $ sometimesGenNothing (StringVal <$> genSmallString)
 
--- genDoubleCol :: Int -> Gen [Maybe Value]
--- genDoubleCol colLen =
---   QC.vectorOf colLen $ sometimesGenNothing (DoubleVal <$> genSmallDouble)
-
 -- | "Wrapper" generator that randomly generates a table schema
 -- & a table that abides by that schema
 genSchemaAndTable :: Gen Table
 genSchemaAndTable = genSchema >>= genTable
-
--- TODO: reread State monad lecture notes to figure out JoinExps
 
 -- | Given a (table, schema) pair,
 -- decide if a particular query is accepted by the table
@@ -461,35 +436,6 @@ accept (table, schema) (Query s f w gb ob l) =
 
 --------------------------------------------------------------------------------
 
--- | Generate a small set of names for generated tests. These names are guaranteed to not include
--- reserved words
-
--- TODO: fix!
--- prop_roundtrip_val :: Value -> Bool
--- prop_roundtrip_val v = P.parse valueP (pretty v) == Right v
-
--- prop_roundtrip_query :: Query -> Bool
--- prop_roundtrip_query q = parseQuery (pretty q) == Right q
-
--- prop_table_equality :: Query -> Bool
--- prop_table_equality q = pretty (getSQLTable q) == pretty (getPandasTable (translateSQL q))
-
--- prop_table_len :: Query -> Bool
--- prop_table_len q = length (pretty (getSQLTable q)) == length (pretty (getPandasTable (translateSQL q)))
-
--- irrelevantFieldsAreNothing :: (Data d) => d -> Maybe d
--- irrelevantFieldsAreNothing x =
---   if fieldsAreNothing x then Nothing else Just x
-
--- checkTableEquality :: Table --> Table
--- checkTableEquality t1 t2 = Data.List.sort t1 == Data.List.sort t2
---------------------------------------------------------------------------------
--- Permitted table & column names
-
--- List of permitted colnames
-colNames :: [ColName]
-colNames = ["col0", "col1", "col2", "col3", "col4"]
-
 -- List of permitted TableNames (single letters from A - Z)
 tableNames :: [TableName]
 tableNames = map (: []) ['A' .. 'Z']
@@ -534,17 +480,14 @@ prop_schema_uniqueCols schema =
   let colNames = (Set.fromList . Map.keys) schema
    in Set.size colNames == Map.size schema
 
--- Check that the getColIdxs function is injective
--- (i.e. distinct columns map to distinct column indexes)
-prop_getColIdxs_injective :: Schema -> Bool
-prop_getColIdxs_injective schema = undefined "TODO"
-
 --------------------------------------------------------------------------------
--- qc :: IO ()
--- qc = do
---   putStrLn "roundtrip_query"
---   QC.quickCheck prop_roundtrip_query
---   putStrLn "roundtrip_select"
---   QC.quickCheck prop_roundtrip_select
---   putStrLn "roundtrip_where"
---   QC.quickCheck prop_roundtrip_where
+qc :: IO ()
+qc = do
+  putStrLn "roundtrip_select"
+  QC.quickCheck prop_roundtrip_select
+  putStrLn "roundtrip_from"
+  QC.quickCheck prop_roundtrip_from
+  putStrLn "roundtrip_where"
+  QC.quickCheck prop_roundtrip_where
+  putStrLn "schema_uniqueCols"
+  QC.quickCheck prop_schema_uniqueCols

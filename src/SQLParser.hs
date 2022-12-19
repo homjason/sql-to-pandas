@@ -17,8 +17,6 @@ import Data.Set qualified as Set
 import Parser (Parser)
 import Parser qualified as P
 import Print
--- import Test.HUnit (Assertion, Counts, Test (..), assert, runTestTT, (~:), (~?=))
--- import Test.QuickCheck qualified as QC
 import Translator (decompColExps, getAggCols, getAggFuncs, getColNames, getNonAggCols, translateSQL)
 import Types.PandasTypes as Pandas
 import Types.SQLTypes as SQL
@@ -292,9 +290,6 @@ comparableP =
 groupByP :: Parser [ColName]
 groupByP = stringP "group by" *> P.sepBy1 colnameP (stringP ",")
 
--- >>> P.parse groupByP "group by col0, col1"
--- Right ["col0","col1"]
-
 -- | Parse ORDER BY expressions
 -- We stipulate that the query must specify the sort order (ASC or DESC)
 orderByP :: Parser (ColName, Order)
@@ -328,9 +323,6 @@ queryP =
 -- | Wrapper function for parsing a string as a SQL query
 parseQuery :: String -> Either P.ParseError Query
 parseQuery str = P.parse queryP (map toLower str)
-
--- TODO: need to check that WHERE expressions are well-typed
--- (need to have at least Op1 or Op2 in WHERE expressions)
 
 -- | Checks if a Query contains valid SQL syntax / is semantically correct
 -- (this function will be used in QuickCheck properties as a precondition)
