@@ -1243,7 +1243,8 @@ test_runParseTranslatePrint =
         runSqlToPandas "SELECT * FROM songs_df WHERE duration_min = 3 or duration_min != 5" ~?= "songs_df.loc[songs_df[\"duration_min\"] == 3 | songs_df[\"duration_min\"] != 5]",
         runSqlToPandas "SELECT artist_name FROM artists_df WHERE artist_name IS NOT NULL" ~?= "artists_df[\"artist_name\"].loc[artists_df[\"artist_name\"].notnull()]",
         runSqlToPandas "SELECT birthday FROM artists_df WHERE artist_name IS NULL" ~?= "artists_df[\"birthday\"].loc[artists_df[\"artist_name\"].isnull()]",
-        runSqlToPandas "SELECT DISTINCT lunch, dinner FROM restaurant_df" ~?= "restaurant_df[\"lunch\",\"dinner\"].drop_duplicates(subset=[\"lunch\",\"dinner\"])"
+        runSqlToPandas "SELECT DISTINCT lunch, dinner FROM restaurant_df" ~?= "restaurant_df[\"lunch\",\"dinner\"].drop_duplicates(subset=[\"lunch\",\"dinner\"])",
+        runSqlToPandas "SELECT day, COUNT(total_bills) FROM tips_df WHERE tip > 2 GROUP BY day" ~?= "tips_df[\"day\",\"total_bills\"].loc[tips_df[\"tip\"] > 2].groupby(by=[\"day\"]).agg({\"total_bills\":\"count\"}).reset_index()"
       ]
 
 --------------------------------------------------------------------------------
