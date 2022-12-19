@@ -136,11 +136,7 @@ listToDoc cExps = case cExps of
   hd : tl -> pp hd <> PP.text ", " <> listToDoc tl
 
 instance PP SelectExp where
-  -- pp (Cols cExps) = PP.text $ "SELECT " <> show (map pp cExps)
   pp (Cols cExps) = PP.text $ "select " <> tail (init (show (map pp cExps)))
-  -- pp (Cols cExps) = PP.text $ "SELECT " <> foldr (\x acc -> acc ++ pp x ++ PP.text ", ") PP.empty cExps
-  -- pp (Cols cExps) = PP.text "SELECT " <> listToDoc cExps
-  -- pp (Cols cExps) = PP.text "SELECT " <> intercalate ", " ((map (show . pp) cExps))
   pp (DistinctCols cExps) = PP.text $ "select distinct " <> tail (init (show (map pp cExps)))
   pp Star = PP.text "select *\n"
 
