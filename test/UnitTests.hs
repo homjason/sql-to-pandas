@@ -1232,11 +1232,18 @@ test_runParseTranslatePrint =
         runSqlToPandas "SELECT col\nFROM table\nORDER BY col ASC" ~?= "table[\"col\"].sort_values(by=[\"col\"], ascending=True)",
         runSqlToPandas "SELECT col, col2\nFROM table\nWHERE col > 4" ~?= "table[\"col\",\"col2\"].loc[table[\"col\"] > 4]",
         runSqlToPandas "SELECT col1, col2\nFROM table1 JOIN table2 ON table1.col1 = table2.col1" ~?= "table1[\"col1\",\"col2\"].merge(table2, left_on=\"col1\", right_on=\"col1\", how=\"inner\")",
+        runSqlToPandas "SELECT col1, col2\nFROM table1 LEFT JOIN table2 ON table1.col1 = table2.col1" ~?= "table1[\"col1\",\"col2\"].merge(table2, left_on=\"col1\", right_on=\"col1\", how=\"left\")",
         runSqlToPandas "select col1 \n from table \n where col1 > 0\n group by col1 \n order by col1 asc \n limit 5" ~?= "table[\"col1\"].loc[table[\"col1\"] > 0].groupby(by=[\"col1\"]).sort_values(by=[\"col1\"], ascending=True).head(5).reset_index()",
         runSqlToPandas "" ~?= "No parses",
+        runSqlToPandas "FROM songs_df" ~?= "No parses",
+        runSqlToPandas "SELECT * WHERE col > 5 FROM table" ~?= "No parses",
+        runSqlToPandas "SELECT FROM routes_df" ~?= "No parses",
         runSqlToPandas "SELECT * FROM songs_df WHERE duration_min >= 3 and duration_min <= 5" ~?= "songs_df.loc[songs_df[\"duration_min\"] >= 3 & songs_df[\"duration_min\"] <= 5]",
         runSqlToPandas "SELECT * FROM songs_df WHERE duration_min < 2 or duration_min > 5" ~?= "songs_df.loc[songs_df[\"duration_min\"] < 2 | songs_df[\"duration_min\"] > 5]",
-        runSqlToPandas "SELECT * FROM songs_df WHERE duration_min = 3 or duration_min != 5" ~?= "songs_df.loc[songs_df[\"duration_min\"] == 3 | songs_df[\"duration_min\"] != 5]"
+        runSqlToPandas "SELECT * FROM songs_df WHERE duration_min = 3 or duration_min != 5" ~?= "songs_df.loc[songs_df[\"duration_min\"] == 3 | songs_df[\"duration_min\"] != 5]",
+        runSqlToPandas "SELECT artist_name FROM artists_df WHERE artist_name IS NOT NULL" ~?= "artists_df[\"artist_name\"].loc[artists_df[\"artist_name\"].notnull()]",
+        runSqlToPandas "SELECT birthday FROM artists_df WHERE artist_name IS NULL" ~?= "artists_df[\"birthday\"].loc[artists_df[\"artist_name\"].isnull()]",
+        runSqlToPandas "SELECT DISTINCT lunch, dinner FROM restaurant_df" ~?= "restaurant_df[\"lunch\",\"dinner\"].drop_duplicates(subset=[\"lunch\",\"dinner\"])"
       ]
 
 --------------------------------------------------------------------------------

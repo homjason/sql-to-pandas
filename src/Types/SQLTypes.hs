@@ -122,11 +122,3 @@ data LogicOp
   = And
   | Or
   deriving (Eq, Show, Enum, Bounded)
-
--- TODO: come back to this
--- QUESTION FOR JOE: Do we need to use the state monad to map table aliases to the acutal table datatype?
--- `As` operator in SQL
-data RenameOp
-  = AsCol ColName
-  | AsTable TableName
-  | AsAgg ColName ColName
