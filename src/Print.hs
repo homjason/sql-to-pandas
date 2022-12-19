@@ -7,7 +7,7 @@ import Data.List
 import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Maybe
-import Test.HUnit
+import Test.HUnit ()
 import Test.QuickCheck (Arbitrary (..), Gen)
 import Test.QuickCheck qualified as QC
 import Text.PrettyPrint (Doc, (<+>))

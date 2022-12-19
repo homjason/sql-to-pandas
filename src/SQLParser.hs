@@ -262,8 +262,8 @@ bopP =
           constP "*" (SQL.Arith Times),
           constP "/" (SQL.Arith Divide),
           constP "%" (SQL.Arith Modulo),
-          constP " and " (SQL.Logic SQL.And),
-          constP " or " (SQL.Logic SQL.Or)
+          constP "and" (SQL.Logic SQL.And),
+          constP "or" (SQL.Logic SQL.Or)
         ]
 
 -- | Parses (postfix) unary operators
@@ -291,6 +291,9 @@ comparableP =
 -- | Parse GROUP BY expressions
 groupByP :: Parser [ColName]
 groupByP = stringP "group by" *> P.sepBy1 colnameP (stringP ",")
+
+-- >>> P.parse groupByP "group by col0, col1"
+-- Right ["col0","col1"]
 
 -- | Parse ORDER BY expressions
 -- We stipulate that the query must specify the sort order (ASC or DESC)

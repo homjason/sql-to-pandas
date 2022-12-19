@@ -290,19 +290,19 @@ instance Arbitrary ColType where
   shrink c = [IntC]
 
 -- | Arbitrary instance for Table Schemas
-instance Arbitrary Schema where
-  arbitrary :: Gen Schema
-  arbitrary = genSchema
+-- instance Arbitrary Schema where
+--   arbitrary :: Gen Schema
+--   arbitrary = genSchema
 
-  shrink :: Schema -> [Schema]
-  shrink schema = shrinkSchema schema
+--   shrink :: Schema -> [Schema]
+--   shrink schema = shrinkSchema schema
 
 -- | Shrinker for schemas
-shrinkSchema :: Schema -> [Schema]
-shrinkSchema schema = do
-  (colName, colType) <- Map.toList schema
-  shrunkType <- shrink colType
-  return $ Map.singleton colName shrunkType
+-- shrinkSchema :: Schema -> [Schema]
+-- shrinkSchema schema = do
+--   (colName, colType) <- Map.toList schema
+--   shrunkType <- shrink colType
+--   return $ Map.singleton colName shrunkType
 
 -- | Generator for schemas
 genSchema :: Gen Schema
@@ -538,12 +538,6 @@ prop_schema_uniqueCols schema =
 -- (i.e. distinct columns map to distinct column indexes)
 prop_getColIdxs_injective :: Schema -> Bool
 prop_getColIdxs_injective schema = undefined "TODO"
-
--- >>> elems (array ((0,0),(3,0)) [((0,0),Just (StringVal "b")),((1,0),Just (StringVal "acabc")),((2,0),Just (StringVal "bbdb")),((3,0),Just (StringVal "c"))])
--- [Just (StringVal "b"),Just (StringVal "acabc"),Just (StringVal "bbdb"),Just (StringVal "c")]
-
--- >>> assocs (array ((0,0),(3,0)) [((0,0),Just (StringVal "b")),((1,0),Just (StringVal "acabc")),((2,0),Just (StringVal "bbdb")),((3,0),Just (StringVal "c"))])
--- [((0,0),Just (StringVal "b")),((1,0),Just (StringVal "acabc")),((2,0),Just (StringVal "bbdb")),((3,0),Just (StringVal "c"))]
 
 --------------------------------------------------------------------------------
 -- qc :: IO ()
