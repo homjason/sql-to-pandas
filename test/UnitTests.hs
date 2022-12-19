@@ -1232,7 +1232,29 @@ test_printSQLQuery =
                 limit = Nothing
               }
           )
-          ~?= PP.text "select col from table order by col asc"
+          ~?= PP.text "select col from table order by col asc",
+        pp
+          ( Query
+              { select = Cols [Col "col"],
+                from = Table "table",
+                wher = Nothing,
+                groupBy = Nothing,
+                orderBy = Nothing,
+                limit = Just 3
+              }
+          )
+          ~?= PP.text "select col from table limit 3",
+        pp
+          ( Query
+              { select = Cols [Col "col", Agg Count "col2"],
+                from = Table "table",
+                wher = Just $ SQL.Op1 (SQL.CompVal $ SQL.ColName "col") SQL.IsNotNull,
+                groupBy = Just ["col"],
+                orderBy = Just ("col", Asc),
+                limit = Just 10
+              }
+          )
+          ~?= PP.text "select col,count(col2) from table where col is not null group by col order by col asc limit 10"
       ]
 
 --------------------------------------------------------------------------------
