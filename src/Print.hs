@@ -160,11 +160,11 @@ instance PP Pandas.Command where
 instance PP Query where
   pp (Query s f w gb ob l) = case (w, gb, ob, l) of
     (Nothing, Nothing, Nothing, Nothing) -> pp s <> PP.char ' ' <> pp f
-    (Just wher, Nothing, Nothing, Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text "where " <> pp wher
+    (Just wher, Nothing, Nothing, Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher
     (Nothing, Just g, Nothing, Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " group by " <> PP.text (show g)
     (Nothing, Nothing, Just o@(cName, or), Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or)
     (Nothing, Nothing, Nothing, Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " limit " <> PP.text (show x)
-    (Just wher, Just g, Nothing, Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text "where " <> pp wher <> PP.text " group by " <> PP.text (show g)
+    (Just wher, Just g, Nothing, Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " where " <> pp wher <> PP.text " group by " <> PP.text (show g)
     (Nothing, Just g, Just o@(cName, or), Nothing) -> pp s <> PP.char ' ' <> pp f <> PP.text " group by " <> PP.text (show g) <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or)
     (Nothing, Nothing, Just o@(cName, or), Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " order by " <> PP.text (show cName) <> PP.text " " <> PP.text (show or) <> PP.text " limit " <> PP.text (show x)
     (Nothing, Just g, Nothing, Just x) -> pp s <> PP.char ' ' <> pp f <> PP.text " group by " <> PP.text (show g) <> PP.text " limit " <> PP.text (show x)
