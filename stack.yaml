@@ -1,4 +1,4 @@
-resolver: lts-19.19
-allow-newer: true
+resolver: lts-20.5
+compiler: ghc-9.2.5
 packages:
 - .
